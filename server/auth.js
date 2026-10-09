@@ -7,15 +7,29 @@ const SCRYPT_PARAMS = {
   keyLength: 64,
 };
 
-const SESSION_TTL_HOURS = Number(
-  process.env.SESSION_TTL_HOURS || 24 * 30,
+function readPositiveNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const SESSION_TTL_HOURS = readPositiveNumber(
+  process.env.SESSION_TTL_HOURS,
+  24 * 30,
 );
 const SESSION_TTL_MS = SESSION_TTL_HOURS * 60 * 60 * 1000;
-const PASSWORD_RESET_TTL_HOURS = Number(
-  process.env.PASSWORD_RESET_TTL_HOURS || 2,
+const SESSION_REFRESH_INTERVAL_MS = Math.max(
+  60 * 1000,
+  readPositiveNumber(process.env.SESSION_REFRESH_INTERVAL_MINUTES, 5) *
+    60 *
+    1000,
 );
-const EMAIL_VERIFICATION_TTL_HOURS = Number(
-  process.env.EMAIL_VERIFICATION_TTL_HOURS || 24,
+const PASSWORD_RESET_TTL_HOURS = readPositiveNumber(
+  process.env.PASSWORD_RESET_TTL_HOURS,
+  2,
+);
+const EMAIL_VERIFICATION_TTL_HOURS = readPositiveNumber(
+  process.env.EMAIL_VERIFICATION_TTL_HOURS,
+  24,
 );
 
 function scryptAsync(password, salt) {
@@ -186,4 +200,15 @@ export function touchSession(session) {
   ).toISOString();
 
   return session;
+}
+
+export function shouldRefreshSession(session) {
+  const lastSeenAt = Date.parse(
+    session?.lastSeenAt || session?.createdAt || "",
+  );
+
+  return (
+    !Number.isFinite(lastSeenAt) ||
+    Date.now() - lastSeenAt >= SESSION_REFRESH_INTERVAL_MS
+  );
 }

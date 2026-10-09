@@ -16,6 +16,7 @@ import { Database, Check, ArrowRight, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Logo } from "./Logo";
 import { api } from "../lib/api";
+import { isDemoUser as isDemoIdentity } from "../lib/session";
 import { safeJsonParse, safeStorageGet } from "../lib/storage";
 
 interface DatabaseForm {
@@ -119,7 +120,7 @@ export function DatabaseConnectionPage({
     safeStorageGet("orrico_current_user"),
     {},
   );
-  const isDemoUser = currentUser.authProvider === "demo";
+  const isDemoUser = isDemoIdentity(currentUser);
 
   const form = useForm<DatabaseForm>({
     defaultValues: {

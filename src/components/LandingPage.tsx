@@ -9,19 +9,30 @@ import { Footer } from "./Footer";
 
 interface LandingPageProps {
   onNavigateToAuth?: () => void;
+  onNavigateToSignIn?: () => void;
+  onNavigateToDemo?: () => void;
   onNavigateToSupport?: () => void;
 }
 
-export function LandingPage({ onNavigateToAuth, onNavigateToSupport }: LandingPageProps) {
+export function LandingPage({
+  onNavigateToAuth,
+  onNavigateToSignIn,
+  onNavigateToDemo,
+  onNavigateToSupport,
+}: LandingPageProps) {
   return (
     <div className="min-h-screen bg-background">
       <Header
-        onSignInClick={onNavigateToAuth}
+        onSignInClick={onNavigateToSignIn || onNavigateToAuth}
         onGetStartedClick={onNavigateToAuth}
+        onDemoClick={onNavigateToDemo}
         onSupportClick={onNavigateToSupport}
       />
       <main>
-        <Hero onGetStartedClick={onNavigateToAuth} />
+        <Hero
+          onGetStartedClick={onNavigateToAuth}
+          onDemoClick={onNavigateToDemo}
+        />
         <Features />
         <HowItWorks />
         <ChatDemo />

@@ -4,7 +4,8 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import pg from "pg";
 
-const { Client: PostgresClient } = pg;
+const { Pool: PostgresPool } = pg;
+let postgresPool = null;
 
 const PG_TABLES = {
   users: "orrico_users",
@@ -66,6 +67,16 @@ function ensureDataDirectory() {
 
 function getDatabaseUrl() {
   return process.env.DATABASE_URL || "";
+}
+
+function getPositiveInteger(value, fallback, maximum = Number.MAX_SAFE_INTEGER) {
+  const parsed = Number.parseInt(String(value || ""), 10);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return Math.min(parsed, maximum);
 }
 
 function usePostgresStore() {
@@ -550,16 +561,47 @@ function readSqliteData() {
   }
 }
 
-async function openPostgresClient() {
-  const client = new PostgresClient({
-    connectionString: getDatabaseUrl(),
-    ssl: process.env.PGSSL === "disable"
-      ? undefined
-      : { rejectUnauthorized: false },
-  });
+function getPostgresPool() {
+  if (!postgresPool) {
+    postgresPool = new PostgresPool({
+      connectionString: getDatabaseUrl(),
+      ssl: process.env.PGSSL === "disable"
+        ? undefined
+        : { rejectUnauthorized: false },
+      max: getPositiveInteger(process.env.PG_POOL_MAX, 5, 10),
+      connectionTimeoutMillis: getPositiveInteger(
+        process.env.PG_CONNECT_TIMEOUT_MS,
+        5000,
+        30000,
+      ),
+      idleTimeoutMillis: getPositiveInteger(
+        process.env.PG_IDLE_TIMEOUT_MS,
+        10000,
+        60000,
+      ),
+      allowExitOnIdle: true,
+    });
 
-  await client.connect();
-  return client;
+    postgresPool.on("error", (error) => {
+      console.error(
+        JSON.stringify({
+          level: "error",
+          event: "postgres_pool_error",
+          message: error.message,
+        }),
+      );
+    });
+  }
+
+  return postgresPool;
+}
+
+async function openPostgresClient() {
+  return getPostgresPool().connect();
+}
+
+function closePostgresClient(client) {
+  client.release();
 }
 
 async function initializePostgres(client) {
@@ -970,7 +1012,7 @@ async function readPostgresData() {
       })),
     };
   } finally {
-    await client.end();
+    closePostgresClient(client);
   }
 }
 
@@ -981,7 +1023,7 @@ async function writePostgresData(nextData) {
     await initializePostgres(client);
     await persistPostgresSnapshot(client, nextData);
   } finally {
-    await client.end();
+    closePostgresClient(client);
   }
 }
 
@@ -1026,7 +1068,7 @@ export async function appendAuditEntry(entry) {
         ],
       );
     } finally {
-      await client.end();
+      closePostgresClient(client);
     }
 
     return;
@@ -1065,7 +1107,7 @@ export async function checkStoreHealth() {
         mode: "postgresql",
       };
     } finally {
-      await client.end();
+      closePostgresClient(client);
     }
   }
 

@@ -5,8 +5,12 @@ function nowIso() {
 }
 
 export function requestContextMiddleware(request, response, next) {
-  request.requestId =
-    request.headers["x-request-id"] || crypto.randomUUID();
+  const suppliedRequestId = String(
+    request.headers["x-request-id"] || "",
+  ).trim();
+  request.requestId = /^[a-zA-Z0-9._:-]{1,128}$/.test(suppliedRequestId)
+    ? suppliedRequestId
+    : crypto.randomUUID();
   response.setHeader("x-request-id", request.requestId);
   next();
 }
@@ -34,9 +38,16 @@ export function requestLoggerMiddleware(request, response, next) {
 }
 
 export function errorHandler(error, request, response, _next) {
-  const statusCode = Number(error?.statusCode || 500);
-  const message =
-    statusCode >= 500
+  const requestedStatusCode = Number(
+    error?.statusCode || error?.status || 500,
+  );
+  const statusCode =
+    requestedStatusCode >= 400 && requestedStatusCode <= 599
+      ? requestedStatusCode
+      : 500;
+  const message = error?.type === "entity.parse.failed"
+    ? "Malformed JSON body."
+    : statusCode >= 500
       ? "Internal server error."
       : error?.message || "Request failed.";
 
@@ -54,5 +65,12 @@ export function errorHandler(error, request, response, _next) {
     }),
   );
 
-  response.status(statusCode).json({ error: message });
+  if (response.headersSent) {
+    return;
+  }
+
+  response.status(statusCode).json({
+    error: message,
+    requestId: request.requestId,
+  });
 }

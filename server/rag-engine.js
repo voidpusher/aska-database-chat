@@ -3,11 +3,10 @@ import {
   getSchemaOverviewForConnection,
 } from "./query-runtime.js";
 
-// ---------------------------------------------------------------------------
-// Embedding model — lazy-loaded, ~22MB download on first use
-// ---------------------------------------------------------------------------
+const VECTOR_SIZE = 512;
 
-let _embedder = null;
+function hashFeature(value) {
+  let hash = 2166136261;
 
 async function getEmbedder() {
   if (!_embedder) {
@@ -17,13 +16,44 @@ async function getEmbedder() {
       "Xenova/all-MiniLM-L6-v2",
     );
   }
-  return _embedder;
+
+  return Math.abs(hash) % VECTOR_SIZE;
+}
+
+function addFeature(vector, feature, weight) {
+  vector[hashFeature(feature)] += weight;
 }
 
 async function embed(text) {
-  const model = await getEmbedder();
-  const out = await model(text, { pooling: "mean", normalize: true });
-  return Array.from(out.data);
+  const normalized = String(text)
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0900-\u097f\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const tokens = normalized.split(" ").filter(Boolean);
+  const vector = new Array(VECTOR_SIZE).fill(0);
+
+  tokens.forEach((token, index) => {
+    addFeature(vector, `word:${token}`, 1);
+
+    if (index < tokens.length - 1) {
+      addFeature(vector, `pair:${token}:${tokens[index + 1]}`, 0.7);
+    }
+
+    if (token.length >= 3) {
+      for (let offset = 0; offset <= token.length - 3; offset += 1) {
+        addFeature(vector, `tri:${token.slice(offset, offset + 3)}`, 0.2);
+      }
+    }
+  });
+
+  const magnitude = Math.sqrt(
+    vector.reduce((total, value) => total + value * value, 0),
+  );
+
+  return magnitude > 0
+    ? vector.map((value) => value / magnitude)
+    : vector;
 }
 
 function cosineSimilarity(a, b) {

@@ -139,6 +139,50 @@ test("health endpoints expose runtime status", async () => {
   assert.equal(ready.body.ready, true);
 });
 
+test("API boundaries return structured errors", async () => {
+  const missingRoute = await request("/does-not-exist");
+  assert.equal(missingRoute.status, 404);
+  assert.equal(missingRoute.body.error, "API endpoint not found.");
+  assert.ok(missingRoute.body.requestId);
+
+  const malformedResponse = await fetch(`${baseUrl}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{not-json",
+  });
+  const malformedBody = await malformedResponse.json();
+  assert.equal(malformedResponse.status, 400);
+  assert.equal(malformedBody.error, "Malformed JSON body.");
+  assert.ok(malformedBody.requestId);
+});
+
+test("authentication inputs have bounded lengths", async () => {
+  const oversizedSignup = await request("/auth/signup", {
+    method: "POST",
+    body: JSON.stringify({
+      firstName: "A".repeat(81),
+      lastName: "User",
+      email: `bounded-${Date.now()}@example.com`,
+      businessName: "Test Store",
+      password: "password123",
+    }),
+  });
+
+  assert.equal(oversizedSignup.status, 400);
+  assert.match(oversizedSignup.body.error, /too long/i);
+
+  const oversizedLogin = await request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "demo@orrico.com",
+      password: "x".repeat(257),
+    }),
+  });
+
+  assert.equal(oversizedLogin.status, 400);
+  assert.equal(oversizedLogin.body.error, "Invalid login request.");
+});
+
 test("password reset updates the account password", async () => {
   const email = `reset-${Date.now()}@example.com`;
   await signupAndVerify(email);
@@ -184,10 +228,9 @@ test("password reset updates the account password", async () => {
   assert.ok(newPasswordLogin.body.token);
 });
 
-test("dashboard APIs and write paths work for the SQLite/demo flow", async () => {
-  const login = await request("/auth/login", { method: "POST", body: JSON.stringify({ email: "demo@orrico.com", password: "demo123" }) });
-  assert.equal(login.status, 200);
-  const token = login.body.token;
+test("new accounts cannot access sample dashboard data before setup", async () => {
+  const email = `dashboard-${Date.now()}@example.com`;
+  const token = await signupAndVerify(email);
   const authHeaders = {
     Authorization: `Bearer ${token}`,
   };
@@ -195,9 +238,65 @@ test("dashboard APIs and write paths work for the SQLite/demo flow", async () =>
   const summary = await request("/dashboard/summary", {
     headers: authHeaders,
   });
+  assert.equal(summary.status, 400);
+  assert.match(summary.body.error, /shop setup/i);
+});
+
+test("dashboard APIs and write paths work in the demo workspace", async () => {
+  const login = await request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "demo@orrico.com",
+      password: "demo123",
+    }),
+  });
+
+  assert.equal(login.status, 200);
+  assert.equal(login.body.user.authProvider, "demo");
+
+  const authHeaders = {
+    Authorization: `Bearer ${login.body.token}`,
+  };
+
+  const oversizedChat = await request("/chat/message", {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({ message: "x".repeat(4001) }),
+  });
+  assert.equal(oversizedChat.status, 413);
+
+  const restoredSession = await request("/auth/session", {
+    headers: authHeaders,
+  });
+  assert.equal(restoredSession.status, 200);
+  assert.equal(restoredSession.body.user.id, "demo-user");
+  assert.equal(restoredSession.body.user.authProvider, "demo");
+
+  const invalidLogin = await request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "demo@orrico.com",
+      password: "wrong-password",
+    }),
+  });
+  assert.equal(invalidLogin.status, 401);
+
+  const summary = await request("/dashboard/summary", {
+    headers: authHeaders,
+  });
   assert.equal(summary.status, 200);
   assert.equal(summary.body.available, true);
   assert.ok(summary.body.metrics.length >= 4);
+
+  const chat = await request("/chat/message", {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({
+      message: "Show me the top 5 products this week",
+    }),
+  });
+  assert.equal(chat.status, 503);
+  assert.match(chat.body.error, /Gemini/);
 
   const createdProduct = await request("/dashboard/products", {
     method: "POST",
@@ -342,7 +441,7 @@ test("customer CSV imports stay isolated and missing Gemini credentials return n
   const intelligence = (await request("/intelligence/status", { headers: headersA })).body;
   assert.equal(intelligence.provider, "gemini");
   assert.equal(intelligence.configured, false);
-  assert.equal((await ask(headersA, "x".repeat(4001))).status, 400);
+  assert.equal((await ask(headersA, "x".repeat(4001))).status, 413);
   await assert.rejects(executeReadOnlyQuery(currentA, "WITH removed AS (DELETE FROM metrics RETURNING *) SELECT * FROM removed"), /read-only/);
   await assert.rejects(executeReadOnlyQuery(currentA, "SELECT * FROM metrics; DROP TABLE metrics"), /read-only/);
   assert.equal((await executeReadOnlyQuery(currentA, "SELECT COUNT(*) AS total FROM metrics"))[0].total, 2);

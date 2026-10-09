@@ -4,6 +4,11 @@ import { ImageWithFallback } from "./ImageWithFallback";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 
+const shopkeeperImage = new URL(
+  "../assets/2609b7d59d0b4c5c57d1b7fab24a98ad05088a2f.png",
+  import.meta.url,
+).href;
+
 interface CTAProps {
   onGetStartedClick?: () => void;
 }

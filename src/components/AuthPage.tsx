@@ -20,12 +20,19 @@ import {
   Lock,
   Building2,
   ArrowLeft,
+  ArrowRight,
   CheckCircle,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
-const shopkeeperImage = new URL("../assets/2609b7d59d0b4c5c57d1b7fab24a98ad05088a2f.png", import.meta.url).href;
+
 import { api } from "../lib/api";
 import { safeStorageRemove, safeStorageSet } from "../lib/storage";
+
+const shopkeeperImage = new URL(
+  "../assets/2609b7d59d0b4c5c57d1b7fab24a98ad05088a2f.png",
+  import.meta.url,
+).href;
 
 interface LoginForm {
   email: string;
@@ -62,8 +69,10 @@ interface ResetPasswordForm {
 interface AuthPageProps {
   onBackToHome?: () => void;
   onNavigateToSupport?: () => void;
+  onNavigateToDemo?: () => void;
   onLogin?: (user?: Record<string, unknown>) => void;
   initialMode?: "verify" | "reset";
+  initialView?: "login" | "signup";
   initialEmail?: string;
   initialToken?: string;
 }
@@ -71,14 +80,17 @@ interface AuthPageProps {
 export function AuthPage({
   onBackToHome,
   onNavigateToSupport,
+  onNavigateToDemo,
   onLogin,
   initialMode,
+  initialView = "login",
   initialEmail,
   initialToken,
 }: AuthPageProps) {
   const [authMode, setAuthMode] = useState<
     "login" | "signup" | "verify" | "forgot" | "reset"
-  >(initialMode || "login");
+  >(initialMode || initialView);
+  const isLogin = authMode === "login";
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
@@ -90,9 +102,6 @@ export function AuthPage({
   const verificationForm = useForm<VerificationForm>();
   const forgotPasswordForm = useForm<ForgotPasswordForm>();
   const resetPasswordForm = useForm<ResetPasswordForm>();
-  const isLogin = authMode === "login";
-  const isSignup = authMode === "signup";
-
   useEffect(() => {
     if (initialEmail) {
       verificationForm.setValue("email", initialEmail);
@@ -1084,6 +1093,34 @@ export function AuthPage({
                     </Button>
                   )}
                 </div>
+
+                {(authMode === "login" || authMode === "signup") && (
+                  <div className="border-t border-border/70 pt-6">
+                    <div className="rounded-lg border border-border/70 bg-muted/45 p-4">
+                      <div className="mb-3 flex items-start gap-3 text-left">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background shadow-sm">
+                          <Sparkles className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="font-medium">Want to look around first?</p>
+                          <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                            Open the separate demo account with sample sales,
+                            products, orders, and customers already loaded.
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-between"
+                        onClick={onNavigateToDemo}
+                      >
+                        Explore Demo Account
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

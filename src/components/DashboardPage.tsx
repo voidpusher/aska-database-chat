@@ -882,9 +882,6 @@ export function DashboardPage({
       };
 
       startPosSimulation();
-      toast.success("POS System Connected", {
-        description: "Transactions will now sync automatically",
-      });
 
       return () => {
         if (posIntervalRef.current) {
@@ -1011,7 +1008,7 @@ export function DashboardPage({
     });
   };
 
-  const togglePosSystem = () => {
+  const updatePosSystem = (enabled: boolean) => {
     if (!isDemoUser) {
       toast.info("POS simulation is available in demo login only.");
       return;
@@ -1023,11 +1020,15 @@ export function DashboardPage({
       return;
     }
 
-    setPosEnabled(!posEnabled);
-    if (!posEnabled) {
-      toast.info("Enabling POS System...");
+    setPosEnabled(enabled);
+    if (enabled) {
+      toast.success("POS System Connected", {
+        description: "New transactions will sync automatically.",
+      });
     } else {
-      toast.info("POS System Disconnected");
+      toast.info("POS System Disconnected", {
+        description: "Automatic transaction sync is now off.",
+      });
     }
   };
 
@@ -1640,14 +1641,27 @@ export function DashboardPage({
                 </>
               )}
             </div>
-            <Button
-              variant={posEnabled ? "default" : "outline"}
-              size="sm"
-              onClick={togglePosSystem}
-            >
-              <Zap className="h-3 w-3 mr-1" />
-              {posEnabled ? "On" : "Off"}
-            </Button>
+            <div className="flex items-center gap-2" role="group" aria-label="POS system">
+              <span
+                className={`text-xs font-medium ${
+                  posEnabled ? "text-muted-foreground" : "text-foreground"
+                }`}
+              >
+                Off
+              </span>
+              <Switch
+                checked={posEnabled}
+                onCheckedChange={updatePosSystem}
+                aria-label="Turn POS system on or off"
+              />
+              <span
+                className={`text-xs font-medium ${
+                  posEnabled ? "text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                On
+              </span>
+            </div>
           </div>
         </div>
 
@@ -3016,12 +3030,19 @@ export function DashboardPage({
                       </p>
                     </div>
                   </div>
-                  <Button
-                    variant={posEnabled ? "default" : "outline"}
-                    onClick={togglePosSystem}
-                  >
-                    {posEnabled ? "Enabled" : "Disabled"}
-                  </Button>
+                  <div className="flex items-center gap-3" role="group" aria-label="POS integration">
+                    <span className="text-sm font-medium text-muted-foreground">
+                      Off
+                    </span>
+                    <Switch
+                      checked={posEnabled}
+                      onCheckedChange={updatePosSystem}
+                      aria-label="Turn POS integration on or off"
+                    />
+                    <span className="text-sm font-medium">
+                      On
+                    </span>
+                  </div>
                 </div>
                 
                 <div className="space-y-2">

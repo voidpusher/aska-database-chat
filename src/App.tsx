@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { LandingPage } from "./components/LandingPage";
 import { AuthPage } from "./components/AuthPage";
 import { SupportPage } from "./components/SupportPage";
@@ -6,11 +6,13 @@ import { ChatPage } from "./components/ChatPage";
 import { DashboardPage } from "./components/DashboardPage";
 import { DatabaseConnectionPage } from "./components/DatabaseConnectionPage";
 import { ShopSetupPage } from "./components/ShopSetupPage";
+import { DemoAccessPage } from "./components/DemoAccessPage";
 import { PricingPage } from "./components/PricingPage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Toaster } from "./components/ui/sonner";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { api } from "./lib/api";
+import { isDemoUser } from "./lib/session";
 import {
   safeJsonParse,
   safeStorageGet,
@@ -21,6 +23,7 @@ import {
 type Page =
   | "landing"
   | "auth"
+  | "demo"
   | "support"
   | "chat"
   | "dashboard"
@@ -30,6 +33,7 @@ type Page =
 
 interface SessionUser {
   id?: string;
+  email?: string;
   authProvider?: string;
   businessName?: string;
   firstName?: string;
@@ -49,7 +53,7 @@ function hasCompletedShopSetup(user: SessionUser | null) {
     return false;
   }
 
-  if (user.authProvider === "demo") {
+  if (isDemoUser(user)) {
     return true;
   }
 
@@ -75,6 +79,8 @@ export default function App() {
   const [currentPage, setCurrentPage] =
     useState<Page>("landing");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const sessionProbeVersion = useRef(0);
+  const [authEntryMode, setAuthEntryMode] = useState<"login" | "signup">("login");
   const [authContext, setAuthContext] = useState<{
     mode?: "verify" | "reset";
     email?: string;
@@ -84,6 +90,7 @@ export default function App() {
   useEffect(() => { window.scrollTo(0, 0); }, [currentPage]);
 
   useEffect(() => {
+    const probeVersion = sessionProbeVersion.current;
     const params = new URLSearchParams(window.location.search);
     const authMode = params.get("auth");
     const email = params.get("email") || "";
@@ -112,6 +119,10 @@ export default function App() {
         if (authMode !== "verify" && authMode !== "reset") setCurrentPage(getNextPageForUser(session.user as SessionUser, lastPage));
       })
       .catch(() => {
+        if (probeVersion !== sessionProbeVersion.current) {
+          return;
+        }
+
         safeStorageRemove("orrico_auth_token");
         safeStorageRemove("orrico_current_user");
       });
@@ -128,6 +139,32 @@ export default function App() {
     setCurrentPage(
       getNextPageForUser(currentUser, safeStorageGet(workspacePageKey(currentUser))),
     );
+  };
+
+  const openAuth = (mode: "login" | "signup") => {
+    setAuthEntryMode(mode);
+    setAuthContext({});
+    setCurrentPage("auth");
+  };
+
+  const handleEnterDemo = async () => {
+    sessionProbeVersion.current += 1;
+    safeStorageRemove("orrico_last_page");
+    safeStorageRemove("orrico_db_connection");
+    const session = await api.login({
+      email: "demo@orrico.com",
+      password: "demo123",
+    });
+
+    if (session.token === "local-demo-session") {
+      safeStorageSet("orrico_auth_token", session.token);
+    } else {
+      safeStorageRemove("orrico_auth_token");
+    }
+
+    safeStorageSet("orrico_current_user", JSON.stringify(session.user));
+    setIsLoggedIn(true);
+    setCurrentPage("chat");
   };
 
   const handleLogout = () => {
@@ -170,14 +207,25 @@ export default function App() {
         <div className="min-h-screen bg-background">
           {currentPage === "landing" && (
             <LandingPage
-              onNavigateToAuth={() => setCurrentPage("auth")}
+              onNavigateToAuth={() => openAuth("signup")}
+              onNavigateToSignIn={() => openAuth("login")}
+              onNavigateToDemo={() => setCurrentPage("demo")}
               onNavigateToSupport={() =>
                 setCurrentPage("support")
               }
             />
           )}
+          {currentPage === "demo" && (
+            <DemoAccessPage
+              onBack={() => setCurrentPage("landing")}
+              onCreateAccount={() => openAuth("signup")}
+              onEnterDemo={handleEnterDemo}
+            />
+          )}
           {currentPage === "auth" && (
             <AuthPage
+              key={`${authEntryMode}-${authContext.mode || "default"}`}
+              initialView={authEntryMode}
               initialMode={authContext.mode}
               initialEmail={authContext.email}
               initialToken={authContext.token}
@@ -185,6 +233,7 @@ export default function App() {
               onNavigateToSupport={() =>
                 setCurrentPage("support")
               }
+              onNavigateToDemo={() => setCurrentPage("demo")}
               onLogin={handleLogin}
             />
           )}

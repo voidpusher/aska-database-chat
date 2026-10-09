@@ -1,14 +1,14 @@
 import { Mic, Database, Zap } from "lucide-react";
-import { toast } from "sonner";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { ImageWithFallback } from "./ImageWithFallback";
 
 interface HeroProps {
   onGetStartedClick?: () => void;
+  onDemoClick?: () => void;
 }
 
-export function Hero({ onGetStartedClick }: HeroProps) {
+export function Hero({ onGetStartedClick, onDemoClick }: HeroProps) {
   return (
     <section className="bg-gradient-to-b from-background to-muted/20 py-20 lg:py-32">
       <div className="container mx-auto px-4">

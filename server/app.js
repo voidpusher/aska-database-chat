@@ -16,6 +16,7 @@ import {
   isPasswordHash,
   isSessionExpired,
   isTimedTokenExpired,
+  shouldRefreshSession,
   touchSession,
   verifyPassword,
 } from "./auth.js";
@@ -92,8 +93,26 @@ const chatRateLimit = rateLimit({
   message: { error: "Too many requests. Please slow down." },
 });
 
+const apiRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (request) => request.path.startsWith("/health"),
+  message: { error: "Too many requests. Please try again shortly." },
+});
+
+const authEndpointRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many authentication requests. Try again later." },
+});
+
 export const app = express();
 app.disable("x-powered-by");
+app.set("trust proxy", 1);
 
 app.use(
   helmet({
@@ -118,6 +137,10 @@ app.use(
     credentials: true,
   }),
 );
+app.use(requestContextMiddleware);
+app.use(requestLoggerMiddleware);
+app.use("/api", apiRateLimit);
+app.use("/api/auth", authEndpointRateLimit);
 app.use(cookieParser());
 app.use(
   express.json({
@@ -129,8 +152,6 @@ app.use(
     },
   }),
 );
-app.use(requestContextMiddleware);
-app.use(requestLoggerMiddleware);
 
 const authAttemptStore = new Map();
 const AUTH_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
@@ -149,6 +170,14 @@ function sanitizeUser(user) {
     emailVerifiedAt: user.emailVerifiedAt || null,
     emailVerified: Boolean(user.emailVerifiedAt),
   };
+}
+
+function isDemoUser(user) {
+  return (
+    user?.authProvider === "demo" ||
+    user?.id === "demo-user" ||
+    String(user?.email || "").trim().toLowerCase() === "demo@orrico.com"
+  );
 }
 
 function createAuditEntry(request, event, userId) {
@@ -211,13 +240,13 @@ function sanitizeConnection(connection) {
 
 function canUseDemoWorkspace(user, connection) {
   return (
-    user?.authProvider === "demo" ||
+    isDemoUser(user) ||
     Boolean(connection?.isDemoConnection)
   );
 }
 
 function getPrivateCsvConnection(userId) {
-  const directory = path.resolve(process.env.APP_DATA_DIRECTORY || "server/data", "workspaces");
+  const directory = path.resolve(process.env.APP_DATA_DIRECTORY || (process.env.VERCEL ? "/tmp/orrico-data" : "server/data"), "workspaces");
   fs.mkdirSync(directory, { recursive: true });
   return {
     userId, databaseType: "sqlite", databaseName: "CSV workspace",
@@ -301,7 +330,19 @@ function normalizeEmail(email) {
 }
 
 function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  return (
+    email.length <= 254 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  );
+}
+
+function normalizeText(value) {
+  return String(value || "").trim();
+}
+
+function isTextLengthValid(value, maximum) {
+  const text = normalizeText(value);
+  return text.length > 0 && text.length <= maximum;
 }
 
 async function pruneExpiredSessions(data) {
@@ -434,8 +475,10 @@ async function getSessionFromRequest(request) {
     return null;
   }
 
-  touchSession(session);
-  await writeData(data);
+  if (shouldRefreshSession(session)) {
+    touchSession(session);
+    await writeData(data);
+  }
 
   return { data, token, session, user };
 }
@@ -483,26 +526,34 @@ async function deliverPasswordResetEmail(user, token) {
   );
 }
 
-app.get("/api/health", async (_request, response) => {
-  const storeHealth = await checkStoreHealth();
-  const storeInfo = getStoreInfo();
-  const runtime = getRuntimeSummary({
-    storeMode: getStoreMode(),
-    storeHealth,
-  });
+app.get("/api/health", async (request, response) => {
+  try {
+    const storeHealth = await checkStoreHealth();
+    const storeInfo = getStoreInfo();
+    const runtime = getRuntimeSummary({
+      storeMode: getStoreMode(),
+      storeHealth,
+    });
 
-  response.json({
-    status: storeHealth.ok ? "ok" : "degraded",
-    timestamp: new Date().toISOString(),
-    store: {
-      ...storeInfo,
-      ...storeHealth,
-    },
-    runtime,
-  });
+    response.json({
+      status: storeHealth.ok ? "ok" : "degraded",
+      timestamp: new Date().toISOString(),
+      store: {
+        ...storeInfo,
+        ...storeHealth,
+      },
+      runtime,
+    });
+  } catch {
+    response.status(503).json({
+      status: "degraded",
+      timestamp: new Date().toISOString(),
+      requestId: request.requestId,
+    });
+  }
 });
 
-app.get("/api/health/ready", async (_request, response) => {
+app.get("/api/health/ready", async (request, response) => {
   try {
     const storeHealth = await checkStoreHealth();
     const runtime = getRuntimeSummary({
@@ -517,13 +568,12 @@ app.get("/api/health/ready", async (_request, response) => {
       timestamp: new Date().toISOString(),
       runtime,
     });
-  } catch (error) {
+  } catch {
     response.status(503).json({
       ready: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Readiness check failed.",
+      timestamp: new Date().toISOString(),
+      error: "A required backend dependency is unavailable.",
+      requestId: request.requestId,
     });
   }
 });
@@ -539,6 +589,17 @@ app.post("/api/auth/signup", async (request, response) => {
 
   if (!firstName || !lastName || !email || !businessName || !password) {
     response.status(400).json({ error: "Missing required fields." });
+    return;
+  }
+
+  if (
+    !isTextLengthValid(firstName, 80) ||
+    !isTextLengthValid(lastName, 80) ||
+    !isTextLengthValid(businessName, 160)
+  ) {
+    response.status(400).json({
+      error: "Name or business details are too long.",
+    });
     return;
   }
 
@@ -559,11 +620,11 @@ app.post("/api/auth/signup", async (request, response) => {
     return;
   }
 
-  if (String(password).length < 8) {
+  if (String(password).length < 8 || String(password).length > 256) {
     recordFailedAuthAttempt(rateLimit.key);
     response
       .status(400)
-      .json({ error: "Password must be at least 8 characters." });
+      .json({ error: "Password must be between 8 and 256 characters." });
     return;
   }
 
@@ -614,10 +675,10 @@ app.post("/api/auth/signup", async (request, response) => {
 
   const user = {
     id: crypto.randomUUID(),
-    firstName: String(firstName).trim(),
-    lastName: String(lastName).trim(),
+    firstName: normalizeText(firstName),
+    lastName: normalizeText(lastName),
     email: normalizedEmail,
-    businessName: String(businessName).trim(),
+    businessName: normalizeText(businessName),
     passwordHash: await hashPassword(String(password)),
     authProvider: "password",
     createdAt: new Date().toISOString(),
@@ -693,6 +754,12 @@ app.post("/api/auth/login", async (request, response) => {
     return;
   }
 
+  if (!isValidEmail(normalizedEmail) || String(password).length > 256) {
+    recordFailedAuthAttempt(rateLimit.key);
+    response.status(400).json({ error: "Invalid login request." });
+    return;
+  }
+
   const data = await readData();
   await pruneExpiredSessions(data);
 
@@ -700,7 +767,27 @@ app.post("/api/auth/login", async (request, response) => {
     (entry) => entry.email.toLowerCase() === normalizedEmail,
   );
 
-  if (user?.authProvider === "password") {
+  if (normalizedEmail === "demo@orrico.com") {
+    if (String(password) !== "demo123") {
+      user = null;
+    } else {
+      if (!user) {
+        user = {
+          id: "demo-user",
+          createdAt: new Date().toISOString(),
+        };
+        data.users.push(user);
+      }
+
+      Object.assign(user, {
+        firstName: "Demo",
+        lastName: "User",
+        email: normalizedEmail,
+        businessName: "Demo Retail Store",
+        authProvider: "demo",
+      });
+    }
+  } else if (user?.authProvider === "password") {
     const submittedPassword = String(password);
     const legacyPassword = user.password;
     let isAuthenticated = false;
@@ -721,22 +808,6 @@ app.post("/api/auth/login", async (request, response) => {
 
     if (!isAuthenticated) {
       user = null;
-    }
-  }
-
-  if (!user && normalizedEmail === "demo@orrico.com" && password === "demo123") {
-    user = {
-      id: "demo-user",
-      firstName: "Demo",
-      lastName: "User",
-      email: normalizedEmail,
-      businessName: "Demo Retail Store",
-      authProvider: "demo",
-      createdAt: new Date().toISOString(),
-    };
-
-    if (!data.users.find((entry) => entry.id === user.id)) {
-      data.users.push(user);
     }
   }
 
@@ -1755,14 +1826,19 @@ app.post("/api/chat/message", chatRateLimit, async (request, response) => {
   }
 
   const { message, conversationId } = request.body || {};
+  const normalizedMessage = normalizeText(message);
 
-  if (!message || !String(message).trim()) {
+  if (!normalizedMessage) {
     response.status(400).json({ error: "Message is required." });
     return;
   }
 
-  if (typeof message !== "string" || message.length > 4000) {
+  if (typeof message !== "string") {
     response.status(400).json({ error: "Questions must be text with at most 4,000 characters." });
+    return;
+  }
+  if (message.length > 4000) {
+    response.status(413).json({ error: "Message must be 4,000 characters or fewer." });
     return;
   }
   if (conversationId !== undefined && (typeof conversationId !== "string" || !/^[a-zA-Z0-9-]{1,80}$/.test(conversationId))) {
@@ -2043,7 +2119,7 @@ const distDir = path.resolve(__dirname, "../dist");
 app.use(express.static(distDir));
 app.get("/{*path}", (req, res) => {
   if (req.path.startsWith("/api/")) {
-    res.status(404).json({ error: "API route not found." });
+    res.status(404).json({ error: "API endpoint not found.", requestId: req.requestId });
     return;
   }
   res.sendFile(path.join(distDir, "index.html"));
