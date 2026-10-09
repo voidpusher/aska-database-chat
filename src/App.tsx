@@ -35,6 +35,11 @@ interface SessionUser {
   firstName?: string;
 }
 
+function workspacePageKey(user?: SessionUser | null) {
+  const account = user || safeJsonParse<SessionUser | null>(safeStorageGet("orrico_current_user"), null);
+  return `aska_last_page_${account?.id || "guest"}`;
+}
+
 function getShopSetupKey(userId: string) {
   return `orrico_shop_setup_${userId}`;
 }
@@ -59,15 +64,11 @@ function getNextPageForUser(
     return "auth";
   }
 
-  if (user.authProvider !== "demo" && !hasCompletedShopSetup(user)) {
-    return "setup";
-  }
-
   return lastPage === "chat" ||
     lastPage === "dashboard" ||
     lastPage === "database"
     ? lastPage
-    : "database";
+    : user.authProvider === "demo" ? "chat" : "database";
 }
 
 export default function App() {
@@ -79,6 +80,8 @@ export default function App() {
     email?: string;
     token?: string;
   }>({});
+
+  useEffect(() => { window.scrollTo(0, 0); }, [currentPage]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -100,18 +103,13 @@ export default function App() {
     api
       .session()
       .then((session) => {
-        const lastPage = safeStorageGet("orrico_last_page");
+        const lastPage = safeStorageGet(workspacePageKey(session.user as SessionUser));
         safeStorageSet(
           "orrico_current_user",
           JSON.stringify(session.user),
         );
         setIsLoggedIn(true);
-        setCurrentPage(
-          getNextPageForUser(
-            session.user as SessionUser,
-            lastPage,
-          ),
-        );
+        if (authMode !== "verify" && authMode !== "reset") setCurrentPage(getNextPageForUser(session.user as SessionUser, lastPage));
       })
       .catch(() => {
         safeStorageRemove("orrico_auth_token");
@@ -128,7 +126,7 @@ export default function App() {
       );
     setIsLoggedIn(true);
     setCurrentPage(
-      getNextPageForUser(currentUser, safeStorageGet("orrico_last_page")),
+      getNextPageForUser(currentUser, safeStorageGet(workspacePageKey(currentUser))),
     );
   };
 
@@ -143,6 +141,7 @@ export default function App() {
   };
 
   const handleDatabaseConnectionComplete = () => {
+    safeStorageSet(workspacePageKey(), "chat");
     setCurrentPage("chat");
   };
 
@@ -210,7 +209,7 @@ export default function App() {
           {currentPage === "pricing" && isLoggedIn && (
             <PricingPage
               onBack={() => setCurrentPage(
-                (safeStorageGet("orrico_last_page") as Page) || "chat"
+                (safeStorageGet(workspacePageKey()) as Page) || "chat"
               )}
               onLogout={handleLogout}
             />
@@ -223,7 +222,7 @@ export default function App() {
               }
               onNavigateToDashboard={() => {
                 safeStorageSet(
-                  "orrico_last_page",
+                  workspacePageKey(),
                   "dashboard",
                 );
                 setCurrentPage("dashboard");
@@ -241,7 +240,7 @@ export default function App() {
                 setCurrentPage("support")
               }
               onNavigateToChat={() => {
-                safeStorageSet("orrico_last_page", "chat");
+                safeStorageSet(workspacePageKey(), "chat");
                 setCurrentPage("chat");
               }}
               onNavigateToLanding={() =>

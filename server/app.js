@@ -1,9 +1,13 @@
+import "./env.js";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import express from "express";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import crypto from "node:crypto";
+import fs from "node:fs";
 import {
   createEmailVerificationToken,
   createPasswordResetToken,
@@ -15,9 +19,7 @@ import {
   touchSession,
   verifyPassword,
 } from "./auth.js";
-import { buildChatReply } from "./chat-engine.js";
-import { buildLlmChatReply } from "./llm-chat-engine.js";
-import { buildRagChatReply, warmupRagEngine } from "./rag-engine.js";
+import { buildLlmChatReply, getChatModel, isChatConfigured } from "./llm-chat-engine.js";
 import {
   assertMessageQuota,
   createCheckoutSession,
@@ -187,6 +189,7 @@ function normalizeConnectionPayload(payload) {
     databaseName: String(payload.databaseName || "").trim(),
     username: String(payload.username || "").trim(),
     password: String(payload.password || "").trim(),
+    ssl: Boolean(payload.ssl),
     filePath: String(payload.filePath || "").trim(),
     isDemoConnection: Boolean(payload.isDemoConnection),
     connectedAt: payload.connectedAt || new Date().toISOString(),
@@ -211,6 +214,30 @@ function canUseDemoWorkspace(user, connection) {
     user?.authProvider === "demo" ||
     Boolean(connection?.isDemoConnection)
   );
+}
+
+function getPrivateCsvConnection(userId) {
+  const directory = path.resolve(process.env.APP_DATA_DIRECTORY || "server/data", "workspaces");
+  fs.mkdirSync(directory, { recursive: true });
+  return {
+    userId, databaseType: "sqlite", databaseName: "CSV workspace",
+    filePath: path.join(directory, `${crypto.createHash("sha256").update(userId).digest("hex")}.sqlite`),
+    isDemoConnection: false, connectedAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  };
+}
+
+function scopeConnectionToUser(payload, user) {
+  if (user.authProvider === "demo") {
+    if (payload.isDemoConnection) return { ...payload, databaseType: "sqlite", filePath: "demo_retail_shop.db", ssl: false };
+    throw new Error("Demo accounts use the sample database. Sign in with your own account to connect private data.");
+  }
+  if (payload.isDemoConnection) throw new Error("Use demo login to access the sample workspace.");
+  if (payload.databaseType === "sqlite") {
+    const privateConnection = getPrivateCsvConnection(user.id);
+    if (payload.filePath && path.resolve(payload.filePath) !== privateConnection.filePath) throw new Error("Use CSV import to create your private SQLite workspace.");
+    return privateConnection;
+  }
+  return payload;
 }
 
 function prepareConnectionForStorage(connection) {
@@ -1024,9 +1051,11 @@ app.get("/api/auth/session", async (request, response) => {
 
 app.post("/api/auth/logout", async (request, response) => {
   const authorization = request.headers.authorization || "";
-  const token = authorization.startsWith("Bearer ")
+  const token = request.cookies?.[SESSION_COOKIE_NAME] || (authorization.startsWith("Bearer ")
     ? authorization.slice(7)
-    : null;
+    : null);
+
+  clearSessionCookie(response);
 
   if (!token) {
     response.status(204).end();
@@ -1036,7 +1065,6 @@ app.post("/api/auth/logout", async (request, response) => {
   const data = await readData();
   data.sessions = data.sessions.filter((entry) => entry.token !== token);
   await writeData(data);
-  clearSessionCookie(response);
   response.status(204).end();
 });
 
@@ -1113,7 +1141,9 @@ app.post("/api/database/test", async (request, response) => {
     return;
   }
 
-  const payload = normalizeConnectionPayload(request.body || {});
+  let payload;
+  try { payload = scopeConnectionToUser(normalizeConnectionPayload(request.body || {}), session.user); }
+  catch (error) { response.status(400).json({ error: error.message }); return; }
   const validationError = validateConnectionPayload(payload);
 
   if (validationError) {
@@ -1171,7 +1201,9 @@ app.post("/api/database/connect", async (request, response) => {
     return;
   }
 
-  const payload = normalizeConnectionPayload(request.body || {});
+  let payload;
+  try { payload = scopeConnectionToUser(normalizeConnectionPayload(request.body || {}), session.user); }
+  catch (error) { response.status(400).json({ error: error.message }); return; }
   const validationError = validateConnectionPayload(payload);
 
   if (validationError) {
@@ -1222,7 +1254,7 @@ app.post("/api/database/import-csv", async (request, response) => {
     return;
   }
 
-  const connection =
+  let connection =
     session.data.databaseConnections.find(
       (entry) => entry.userId === session.user.id,
     ) || null;
@@ -1248,11 +1280,20 @@ app.post("/api/database/import-csv", async (request, response) => {
   }
 
   try {
+    // A first import for a real account must never write into the shared demo.
+    if (!connection && session.user.authProvider !== "demo") {
+      connection = getPrivateCsvConnection(session.user.id);
+    }
     const result = importCsvDataset(connection, {
       csvContent: String(csvContent),
       tableName: String(tableName || ""),
       fileName: String(fileName || ""),
     });
+
+    if (connection && !session.data.databaseConnections.some(entry => entry.userId === session.user.id)) {
+      session.data.databaseConnections.push(connection);
+      await writeData(session.data);
+    }
 
     response.status(201).json(result);
   } catch (error) {
@@ -1700,6 +1741,11 @@ app.get("/api/chat/history", async (request, response) => {
   response.json({ messages });
 });
 
+app.get("/api/intelligence/status", async (request, response) => {
+  if (!await getSessionFromRequest(request)) { response.status(401).json({ error: "Unauthorized." }); return; }
+  response.json({ provider: "gemini", model: getChatModel(), configured: isChatConfigured() });
+});
+
 app.post("/api/chat/message", chatRateLimit, async (request, response) => {
   const session = await getSessionFromRequest(request);
 
@@ -1708,11 +1754,19 @@ app.post("/api/chat/message", chatRateLimit, async (request, response) => {
     return;
   }
 
-  const { message } = request.body || {};
+  const { message, conversationId } = request.body || {};
 
   if (!message || !String(message).trim()) {
     response.status(400).json({ error: "Message is required." });
     return;
+  }
+
+  if (typeof message !== "string" || message.length > 4000) {
+    response.status(400).json({ error: "Questions must be text with at most 4,000 characters." });
+    return;
+  }
+  if (conversationId !== undefined && (typeof conversationId !== "string" || !/^[a-zA-Z0-9-]{1,80}$/.test(conversationId))) {
+    response.status(400).json({ error: "Invalid conversation identifier." }); return;
   }
 
   const connection =
@@ -1743,13 +1797,19 @@ app.post("/api/chat/message", chatRateLimit, async (request, response) => {
 
   try {
     const preparedConnection = prepareConnectionForUse(connection);
-    if (process.env.ANTHROPIC_API_KEY) {
-      result = await buildLlmChatReply(String(message), preparedConnection);
-    } else {
-      result = await buildRagChatReply(String(message), { connection: preparedConnection });
-    }
+
+    // Build conversation history for context (last 6 exchanges)
+    const recentHistory = session.data.chatHistory
+      .filter((h) => h.userId === session.user.id && h.mode === "gemini" && (!conversationId || h.conversationId === conversationId))
+      .slice(-6)
+      .flatMap((h) => [
+        { role: "user",      content: h.message },
+        { role: "assistant", content: h.reply   },
+      ]);
+
+    result = await buildLlmChatReply(String(message), preparedConnection, { history: recentHistory });
   } catch (error) {
-    response.status(400).json({
+    response.status(error.status || 400).json({
       error:
         error instanceof Error
           ? error.message
@@ -1761,6 +1821,7 @@ app.post("/api/chat/message", chatRateLimit, async (request, response) => {
   session.data.chatHistory.push({
     id: crypto.randomUUID(),
     userId: session.user.id,
+    conversationId: conversationId || null,
     message: String(message).trim(),
     reply: result.reply,
     mode: result.mode,
@@ -1768,7 +1829,7 @@ app.post("/api/chat/message", chatRateLimit, async (request, response) => {
   });
   await writeData(session.data);
 
-  response.json(result);
+  response.json({ sql: null, rows: [], ...result });
 });
 
 // ---------------------------------------------------------------------------
@@ -1917,7 +1978,6 @@ app.post("/api/billing/webhook", async (request, response) => {
 });
 
 // Pre-warm the local RAG embedding model so first chat message has no cold-start delay
-warmupRagEngine();
 
 app.get("/api/account/export", async (request, response) => {
   const session = await getSessionFromRequest(request);
@@ -1975,6 +2035,18 @@ app.delete("/api/account", async (request, response) => {
   appendAuditEntry(createAuditEntry(request, "account_deleted", user.id)).catch(() => undefined);
 
   response.json({ ok: true, message: "Account and all associated data deleted." });
+});
+
+// Serve React frontend for direct Node deployments (no nginx)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distDir = path.resolve(__dirname, "../dist");
+app.use(express.static(distDir));
+app.get("/{*path}", (req, res) => {
+  if (req.path.startsWith("/api/")) {
+    res.status(404).json({ error: "API route not found." });
+    return;
+  }
+  res.sendFile(path.join(distDir, "index.html"));
 });
 
 app.use(errorHandler);

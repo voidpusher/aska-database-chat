@@ -196,7 +196,7 @@ export function PricingPage({ onBack, onLogout }: Props) {
             </svg>
             Back
           </button>
-          <span className="text-sm font-semibold text-foreground">Orrico</span>
+          <span className="text-sm font-semibold text-foreground">Aska</span>
           <button
             onClick={onLogout}
             className="text-sm text-muted-foreground transition hover:text-foreground"

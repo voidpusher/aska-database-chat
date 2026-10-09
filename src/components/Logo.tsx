@@ -1,4 +1,3 @@
-import { MessageSquare } from "lucide-react";
 
 interface LogoProps {
   className?: string;
@@ -19,10 +18,14 @@ export function Logo({
 }: LogoProps) {
   const content = (
     <>
-      <MessageSquare className={`${iconClassName} text-primary`} />
+      <svg viewBox="0 0 32 32" fill="none" className={`${iconClassName} text-primary`} role="img" aria-label="Aska logo">
+        <rect x="2" y="2" width="28" height="28" rx="9" fill="currentColor" />
+        <path d="M9 23L15 9H17L23 23M12 18H20" stroke="var(--background)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M23 7V11M21 9H25" stroke="var(--background)" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
       {showText && (
         <span className={`font-semibold ${textClassName}`}>
-          Orrico
+          Aska
         </span>
       )}
     </>

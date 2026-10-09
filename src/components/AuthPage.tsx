@@ -18,13 +18,12 @@ import {
   EyeOff,
   Mail,
   Lock,
-  User,
   Building2,
   ArrowLeft,
   CheckCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import shopkeeperImage from "../assets/2609b7d59d0b4c5c57d1b7fab24a98ad05088a2f.png";
+const shopkeeperImage = new URL("../assets/2609b7d59d0b4c5c57d1b7fab24a98ad05088a2f.png", import.meta.url).href;
 import { api } from "../lib/api";
 import { safeStorageRemove, safeStorageSet } from "../lib/storage";
 
@@ -84,6 +83,7 @@ export function AuthPage({
   const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [entryMode, setEntryMode] = useState<"customer" | "demo">("customer");
 
   const loginForm = useForm<LoginForm>();
   const signupForm = useForm<SignupForm>();
@@ -138,7 +138,7 @@ export function AuthPage({
       persistSession(session.token, session.user);
       setIsLoading(false);
       toast.success(
-        "Welcome back! Redirecting to your dashboard...",
+        "Welcome back! Opening your workspace…",
       );
       setTimeout(() => {
         onLogin?.(session.user as Record<string, unknown>);
@@ -188,6 +188,10 @@ export function AuthPage({
   };
 
   const onSignupSubmit = async (data: SignupForm) => {
+    if (!data.agreeToTerms) {
+      signupForm.setError("agreeToTerms", { message: "You must agree to the terms" });
+      return;
+    }
     if (data.password !== data.confirmPassword) {
       signupForm.setError("confirmPassword", {
         message: "Passwords do not match",
@@ -195,9 +199,9 @@ export function AuthPage({
       return;
     }
 
-    if (data.password.length < 6) {
+    if (data.password.length < 8) {
       signupForm.setError("password", {
-        message: "Password must be at least 6 characters",
+        message: "Password must be at least 8 characters",
       });
       return;
     }
@@ -373,17 +377,17 @@ export function AuthPage({
   };
 
   const benefits = [
-    "Connect any database or POS system",
-    "Natural language queries in 50+ languages",
+    "Connect PostgreSQL, MySQL, or upload a CSV",
+    "Ask questions in plain language",
     "Real-time analytics and insights",
-    "24/7 AI-powered support",
-    "Enterprise-grade security",
+    "SQL and query results you can inspect",
+    "Encrypted database credentials",
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/40">
-      <header className="border-b border-border/70 bg-background/85 backdrop-blur-xl">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
+      <header className="border-b bg-background/95 backdrop-blur">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Logo />
           <div className="flex items-center gap-4">
             {onNavigateToSupport && (
@@ -408,27 +412,27 @@ export function AuthPage({
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-12 lg:py-16">
-        <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
+      <div className="container mx-auto px-4 py-12">
+        <div className="grid lg:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
           <div className="space-y-8">
-            <div className="space-y-5">
-              <Badge variant="secondary" className="w-fit rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            <div className="space-y-4">
+              <Badge variant="secondary" className="w-fit">
                 <CheckCircle className="w-4 h-4 mr-1" />
-                Trusted by 10,000+ Retailers
+                Your data. Your workspace.
               </Badge>
-              <h1 className="text-4xl font-semibold tracking-tight lg:text-5xl">
+              <h1 className="text-3xl lg:text-4xl font-bold">
                 Transform Your Retail
-                <span className="text-primary/80 block">
+                <span className="text-primary block">
                   Business Today
                 </span>
               </h1>
-              <p className="max-w-2xl text-lg leading-8 text-muted-foreground lg:text-xl">
-                Join growing retailers who use Orrico to keep sales, stock,
+              <p className="text-xl text-muted-foreground">
+                Join growing retailers who use Aska to keep sales, stock,
                 customers, and reporting in one clean operating workflow.
               </p>
             </div>
 
-            <div className="grid gap-3 rounded-[1.75rem] border border-border/70 bg-card/85 p-6 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.35)]">
+            <div className="space-y-4">
               {benefits.map((benefit, index) => (
                 <div
                   key={index}
@@ -440,7 +444,7 @@ export function AuthPage({
               ))}
             </div>
 
-            <div className="relative overflow-hidden rounded-[2rem] border border-white/50 shadow-[0_30px_80px_-28px_rgba(15,23,42,0.45)]">
+            <div className="relative rounded-2xl overflow-hidden shadow-xl">
               <img
                 src={shopkeeperImage}
                 alt="Indian shopkeeper using computer in retail shop"
@@ -451,8 +455,8 @@ export function AuthPage({
           </div>
 
           <div className="w-full max-w-md mx-auto">
-            <Card className="border-border/70 bg-card/92 shadow-[0_30px_80px_-36px_rgba(15,23,42,0.4)]">
-              <CardHeader className="space-y-4 text-center">
+            <Card className="shadow-2xl border-0">
+              <CardHeader className="text-center space-y-4">
                 <CardTitle className="text-2xl">
                   {authMode === "login" && "Welcome Back"}
                   {authMode === "signup" && "Create Account"}
@@ -462,9 +466,9 @@ export function AuthPage({
                 </CardTitle>
                 <CardDescription className="text-base">
                   {authMode === "login" &&
-                    "Sign in to continue with your shop, or open the separate demo workspace below"}
+                    "Sign in to your account or try the live demo instantly"}
                   {authMode === "signup" &&
-                    "Create a fresh shop account and start with your own setup"}
+                    "Create your account or try the live demo to explore first"}
                   {authMode === "verify" &&
                     "Enter the verification token to activate your account"}
                   {authMode === "forgot" &&
@@ -473,30 +477,31 @@ export function AuthPage({
                     "Set a new password using your reset token"}
                 </CardDescription>
                 {isLogin && (
-                  <div className="rounded-2xl border border-border/70 bg-muted/60 p-4 text-sm text-left">
-                    <p className="text-muted-foreground">
-                      <strong>Separate Demo Workspace:</strong>
-                    </p>
-                    <p className="text-muted-foreground mt-1">
-                      Email: <code className="bg-background px-1 py-0.5 rounded">demo@orrico.com</code>
-                    </p>
-                    <p className="text-muted-foreground">
-                      Password: <code className="bg-background px-1 py-0.5 rounded">demo123</code>
-                    </p>
-                    <p className="mt-2 text-muted-foreground">
-                      Real accounts start with a new shop setup and do not share this sample data.
-                    </p>
+                  <div className="flex gap-2">
+                    <Button type="button" variant={entryMode === "customer" ? "default" : "outline"} className="flex-1" onClick={() => setEntryMode("customer")} disabled={isLoading}>Customer Login</Button>
+                    <Button type="button" variant={entryMode === "demo" ? "default" : "outline"} className="flex-1" onClick={() => setEntryMode("demo")} disabled={isLoading}>Demo Window</Button>
+                  </div>
+                )}
+                {isLogin && entryMode === "demo" && (
+                  <div className="bg-muted/50 border border-muted-foreground/20 rounded-lg p-3 text-sm">
+                    <p className="text-muted-foreground"><strong>Demo Workspace</strong></p>
+                    <p className="text-muted-foreground mt-1">Explore sample sales, products, customers, orders, and business chat.</p>
                   </div>
                 )}
               </CardHeader>
 
               <CardContent className="space-y-6">
-                {authMode === "login" && (
+                {authMode === "login" && entryMode === "demo" && (
+                  <Button type="button" className="w-full" disabled={isLoading} onClick={() => onLoginSubmit({ email: "demo@orrico.com", password: "demo123", rememberMe: false })}>
+                    {isLoading ? "Opening demo..." : "Open Demo Workspace"}
+                  </Button>
+                )}
+                {authMode === "login" && entryMode === "customer" && (
                   <form
                     onSubmit={loginForm.handleSubmit(
                       onLoginSubmit,
                     )}
-                    className="space-y-5"
+                    className="space-y-4"
                   >
                     <div className="space-y-2">
                       <Label htmlFor="email">
@@ -598,27 +603,13 @@ export function AuthPage({
                       </Button>
                     </div>
 
-                    <div className="space-y-3 pt-1">
+                    <div className="space-y-3">
                       <Button
                         type="submit"
                         className="w-full"
                         disabled={isLoading}
                       >
-                        {isLoading ? "Signing in..." : "Sign In"}
-                      </Button>
-                      
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full"
-                        disabled={isLoading}
-                        onClick={() => {
-                          loginForm.setValue("email", "demo@orrico.com");
-                          loginForm.setValue("password", "demo123");
-                          loginForm.handleSubmit(onLoginSubmit)();
-                        }}
-                      >
-                        Open Demo Workspace
+                        {isLoading ? "Signing in..." : "Sign In to Your Workspace"}
                       </Button>
                     </div>
                   </form>
@@ -629,7 +620,7 @@ export function AuthPage({
                     onSubmit={signupForm.handleSubmit(
                       onSignupSubmit,
                     )}
-                    className="space-y-5"
+                    className="space-y-4"
                   >
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -839,13 +830,8 @@ export function AuthPage({
                     <div className="flex items-start space-x-2">
                       <Checkbox
                         id="agreeToTerms"
-                        {...signupForm.register(
-                          "agreeToTerms",
-                          {
-                            required:
-                              "You must agree to the terms",
-                          },
-                        )}
+                        checked={signupForm.watch("agreeToTerms") || false}
+                        onCheckedChange={checked => signupForm.setValue("agreeToTerms", checked === true, { shouldValidate: true })}
                       />
                       <Label
                         htmlFor="agreeToTerms"
@@ -894,7 +880,7 @@ export function AuthPage({
                     onSubmit={verificationForm.handleSubmit(
                       onVerifySubmit,
                     )}
-                    className="space-y-5"
+                    className="space-y-4"
                   >
                     <div className="space-y-2">
                       <Label htmlFor="verifyEmail">Email Address</Label>
@@ -966,7 +952,7 @@ export function AuthPage({
                     onSubmit={forgotPasswordForm.handleSubmit(
                       onForgotPasswordSubmit,
                     )}
-                    className="space-y-5"
+                    className="space-y-4"
                   >
                     <div className="space-y-2">
                       <Label htmlFor="forgotEmail">Email Address</Label>
@@ -996,7 +982,7 @@ export function AuthPage({
                     onSubmit={resetPasswordForm.handleSubmit(
                       onResetPasswordSubmit,
                     )}
-                    className="space-y-5"
+                    className="space-y-4"
                   >
                     <div className="space-y-2">
                       <Label htmlFor="resetEmail">Email Address</Label>

@@ -598,6 +598,11 @@ export function DashboardPage({
   onNavigateToChat,
   onNavigateToLanding,
 }: DashboardPageProps) {
+  const currentUser = safeJsonParse<{ authProvider?: string; businessName?: string; firstName?: string; lastName?: string; email?: string }>(safeStorageGet("orrico_current_user"), {});
+  const isDemoUser = currentUser.authProvider === "demo";
+  const businessName = isDemoUser ? "Gupta Electronics" : currentUser.businessName || "Your Workspace";
+  const ownerName = isDemoUser ? "Arjun Sharma" : `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim();
+  const initials = isDemoUser ? "JS" : `${currentUser.firstName?.[0] || ""}${currentUser.lastName?.[0] || ""}`.toUpperCase() || "U";
   const [selectedPeriod, setSelectedPeriod] = useState("7d");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
@@ -618,12 +623,14 @@ export function DashboardPage({
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [activeNavItem, setActiveNavItem] = useState("dashboard");
   const [posEnabled, setPosEnabled] = useState(() => {
+    if (!isDemoUser) return false;
     const saved = safeStorageGet("orrico_pos_enabled");
     return safeJsonParse(saved, false);
   });
   const posIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const [products, setProducts] = useState<Product[]>(() => {
+    if (!isDemoUser) return [];
     const savedVersion = safeStorageGet("orrico_data_version");
     
     if (savedVersion !== DATA_VERSION) {
@@ -665,6 +672,7 @@ export function DashboardPage({
   };
 
   const [customers, setCustomers] = useState<Customer[]>(() => {
+    if (!isDemoUser) return [];
     const savedVersion = safeStorageGet("orrico_data_version");
     const saved = safeStorageGet("orrico_customers");
     
@@ -684,6 +692,7 @@ export function DashboardPage({
   });
 
   const [orders, setOrders] = useState<Order[]>(() => {
+    if (!isDemoUser) return [];
     const savedVersion = safeStorageGet("orrico_data_version");
     const saved = safeStorageGet("orrico_orders");
     
@@ -695,11 +704,13 @@ export function DashboardPage({
   });
 
   const [todayRevenue, setTodayRevenue] = useState(() => {
+    if (!isDemoUser) return 0;
     const saved = safeStorageGet("orrico_today_revenue");
     return saved ? parseFloat(saved) : 145750;
   });
 
   const [todayOrders, setTodayOrders] = useState(() => {
+    if (!isDemoUser) return 0;
     const saved = safeStorageGet("orrico_today_orders");
     return saved ? parseInt(saved) : 18;
   });
@@ -734,27 +745,27 @@ export function DashboardPage({
   });
 
   useEffect(() => {
-    safeStorageSet("orrico_products", JSON.stringify(products));
+    if (isDemoUser) safeStorageSet("orrico_products", JSON.stringify(products));
   }, [products]);
 
   useEffect(() => {
-    safeStorageSet("orrico_customers", JSON.stringify(customers));
+    if (isDemoUser) safeStorageSet("orrico_customers", JSON.stringify(customers));
   }, [customers]);
 
   useEffect(() => {
-    safeStorageSet("orrico_orders", JSON.stringify(orders));
+    if (isDemoUser) safeStorageSet("orrico_orders", JSON.stringify(orders));
   }, [orders]);
 
   useEffect(() => {
-    safeStorageSet("orrico_today_revenue", todayRevenue.toString());
+    if (isDemoUser) safeStorageSet("orrico_today_revenue", todayRevenue.toString());
   }, [todayRevenue]);
 
   useEffect(() => {
-    safeStorageSet("orrico_today_orders", todayOrders.toString());
+    if (isDemoUser) safeStorageSet("orrico_today_orders", todayOrders.toString());
   }, [todayOrders]);
 
   useEffect(() => {
-    safeStorageSet("orrico_pos_enabled", JSON.stringify(posEnabled));
+    if (isDemoUser) safeStorageSet("orrico_pos_enabled", JSON.stringify(posEnabled));
   }, [posEnabled]);
 
   const loadDashboardSummary = async ({
@@ -861,7 +872,7 @@ export function DashboardPage({
   }, []);
 
   useEffect(() => {
-    if (posEnabled && !dashboardDetails?.available) {
+    if (isDemoUser && posEnabled && !dashboardDetails?.available) {
       const startPosSimulation = () => {
         const randomDelay = Math.random() * 7000 + 8000; // 8-15 seconds
         posIntervalRef.current = setTimeout(() => {
@@ -1001,6 +1012,10 @@ export function DashboardPage({
   };
 
   const togglePosSystem = () => {
+    if (!isDemoUser) {
+      toast.info("POS simulation is available in demo login only.");
+      return;
+    }
     if (dashboardDetails?.available) {
       toast.info(
         "POS simulation is disabled while a live database connection is active.",
@@ -1558,11 +1573,11 @@ export function DashboardPage({
       : "No active source";
   const salesData = dashboardSummary?.available && dashboardSummary.salesData
     ? dashboardSummary.salesData
-    : fallbackSalesData;
+    : isDemoUser ? fallbackSalesData : [];
   const categoryData =
     dashboardSummary?.available && dashboardSummary.categoryData
       ? dashboardSummary.categoryData
-      : fallbackCategoryData;
+      : isDemoUser ? fallbackCategoryData : [];
   const metrics =
     dashboardSummary?.available && dashboardSummary.metrics
       ? dashboardSummary.metrics.map((metric) => ({
@@ -1578,7 +1593,7 @@ export function DashboardPage({
               <Package className="h-4 w-4" />
             ),
         }))
-      : fallbackMetrics;
+      : isDemoUser ? fallbackMetrics : fallbackMetrics.map(metric => ({ ...metric, value: "—", change: "—" }));
   const topProducts =
     dashboardSummary?.available && dashboardSummary.topProducts
       ? dashboardSummary.topProducts
@@ -1590,22 +1605,22 @@ export function DashboardPage({
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <div className="hidden w-80 shrink-0 flex-col overflow-hidden border-r border-border/70 bg-sidebar/84 md:flex md:backdrop-blur">
-        <div className="border-b border-border/70 p-6">
+      <div className="flex w-80 shrink-0 flex-col overflow-hidden border-r bg-muted/20">
+        <div className="p-6 border-b">
           <Logo iconClassName="h-6 w-6" className="mb-4" onClick={onNavigateToLanding} clickable={!!onNavigateToLanding} />
           <div className="flex items-center gap-2 mb-3">
             <Avatar className="h-8 w-8">
-              <AvatarFallback>JS</AvatarFallback>
+              <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
             <div>
-              <p className="font-medium">Gupta Electronics</p>
+              <p className="font-medium">{businessName}</p>
               <p className="text-sm text-muted-foreground">
-                Vyapar Pro
+                {isDemoUser ? "Demo Workspace" : "Customer Workspace"}
               </p>
             </div>
           </div>
           
-          <div className="flex items-center justify-between rounded-2xl border border-border/70 bg-card/84 p-4 shadow-sm">
+          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
             <div className="flex items-center gap-2">
               {posEnabled ? (
                 <>
@@ -1636,8 +1651,8 @@ export function DashboardPage({
           </div>
         </div>
 
-        <div className="border-b border-border/70 p-6">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Quick Actions</h3>
+        <div className="p-6 border-b">
+          <h3 className="font-medium mb-3">Quick Actions</h3>
           <div className="space-y-2">
             <Button
               onClick={onNavigateToChat}
@@ -1645,7 +1660,7 @@ export function DashboardPage({
               className="w-full justify-start"
             >
               <MessageSquare className="h-4 w-4 mr-2" />
-              Ask Orrico
+              Ask Aska
             </Button>
             <Button
               onClick={() => setShowNewOrderDialog(true)}
@@ -1661,12 +1676,12 @@ export function DashboardPage({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-6">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Navigation</h3>
+          <h3 className="font-medium mb-3">Navigation</h3>
           <div className="space-y-2">
             <Button
               variant="ghost"
               size="sm"
-              className={`w-full justify-start rounded-xl ${
+              className={`w-full justify-start ${
                 activeNavItem === "dashboard" ? "bg-accent shadow-sm" : "hover:bg-card/70"
               }`}
               onClick={() => handleNavigation("dashboard")}
@@ -1677,7 +1692,7 @@ export function DashboardPage({
             <Button
               variant="ghost"
               size="sm"
-              className={`w-full justify-start rounded-xl ${
+              className={`w-full justify-start ${
                 activeNavItem === "products" ? "bg-accent shadow-sm" : "hover:bg-card/70"
               }`}
               onClick={() => handleNavigation("products")}
@@ -1688,7 +1703,7 @@ export function DashboardPage({
             <Button
               variant="ghost"
               size="sm"
-              className={`w-full justify-start rounded-xl ${
+              className={`w-full justify-start ${
                 activeNavItem === "customers" ? "bg-accent shadow-sm" : "hover:bg-card/70"
               }`}
               onClick={() => handleNavigation("customers")}
@@ -1699,7 +1714,7 @@ export function DashboardPage({
             <Button
               variant="ghost"
               size="sm"
-              className={`w-full justify-start rounded-xl ${
+              className={`w-full justify-start ${
                 activeNavItem === "orders" ? "bg-accent shadow-sm" : "hover:bg-card/70"
               }`}
               onClick={() => handleNavigation("orders")}
@@ -1710,7 +1725,7 @@ export function DashboardPage({
             <Button
               variant="ghost"
               size="sm"
-              className={`w-full justify-start rounded-xl ${
+              className={`w-full justify-start ${
                 activeNavItem === "inventory" ? "bg-accent shadow-sm" : "hover:bg-card/70"
               }`}
               onClick={() => handleNavigation("inventory")}
@@ -1721,11 +1736,11 @@ export function DashboardPage({
           </div>
         </div>
 
-        <div className="space-y-2 border-t border-border/70 p-6">
+        <div className="p-6 border-t space-y-2">
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-start rounded-xl hover:bg-card/70"
+            className="w-full justify-start"
             onClick={onNavigateToSupport}
           >
             <HelpCircle className="h-4 w-4 mr-2" />
@@ -1734,7 +1749,7 @@ export function DashboardPage({
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-start rounded-xl hover:bg-card/70"
+            className="w-full justify-start"
             onClick={handleSettings}
           >
             <Settings className="h-4 w-4 mr-2" />
@@ -1743,7 +1758,7 @@ export function DashboardPage({
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-start rounded-xl hover:bg-card/70"
+            className="w-full justify-start"
             onClick={onLogout}
           >
             <LogOut className="h-4 w-4 mr-2" />
@@ -1753,17 +1768,17 @@ export function DashboardPage({
       </div>
 
       <div className="min-w-0 flex-1 overflow-auto">
-        <div className="border-b border-border/70 bg-background/88 px-6 py-5 backdrop-blur-xl">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="p-6 border-b bg-background">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-semibold tracking-tight">
+              <h1 className="text-3xl font-semibold">
                 {activeNavItem === "dashboard" && "Dashboard"}
                 {activeNavItem === "products" && "Products"}
                 {activeNavItem === "customers" && "Customers"}
                 {activeNavItem === "orders" && "Orders"}
                 {activeNavItem === "inventory" && "Inventory"}
               </h1>
-              <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+              <p className="text-muted-foreground">
                 {activeNavItem === "dashboard" && "Welcome back! Here's what's happening with your store today."}
                 {activeNavItem === "products" && "View and manage all your products"}
                 {activeNavItem === "customers" && "Manage your customer relationships"}
@@ -1771,7 +1786,7 @@ export function DashboardPage({
                 {activeNavItem === "inventory" && "Monitor stock levels and inventory"}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
               <ThemeToggle />
               <Button variant="outline" size="sm" onClick={handleExport}>
                 <Download className="h-4 w-4 mr-2" />
@@ -2940,18 +2955,18 @@ export function DashboardPage({
             <TabsContent value="account" className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="shopName">Shop Name</Label>
-                <Input id="shopName" defaultValue="Gupta Electronics" />
+                <Input id="shopName" defaultValue={businessName} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ownerName">Owner Name</Label>
-                <Input id="ownerName" defaultValue="Arjun Sharma" />
+                <Input id="ownerName" defaultValue={ownerName} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="settingsEmail">Email</Label>
                 <Input
                   id="settingsEmail"
                   type="email"
-                  defaultValue="demo@orrico.com"
+                  defaultValue={currentUser.email || ""}
                 />
               </div>
             </TabsContent>

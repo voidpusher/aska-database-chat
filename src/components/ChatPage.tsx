@@ -14,11 +14,14 @@ import {
 import { toast } from "sonner";
 import {
   CHAT_INTENTS,
+  CHAT_INTENT_QUESTION_COUNT,
   type IntentDefinition,
 } from "../data/chatIntents";
 import { api } from "../lib/api";
+import { safeJsonParse, safeStorageGet } from "../lib/storage";
 import { Logo } from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
+import { ChatAnswer } from "./ChatAnswer";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -39,6 +42,7 @@ interface Message {
   id: string;
   type: "user" | "ai";
   content: string;
+  sql?: string | null;
   timestamp: Date;
 }
 
@@ -102,8 +106,8 @@ declare global {
   }
 }
 
-const ASSISTANT_NAME = "Ori";
-const ASSISTANT_FULL_NAME = "Ori from Orrico";
+const ASSISTANT_NAME = "Aska";
+const ASSISTANT_FULL_NAME = "Aska";
 const DEFAULT_WELCOME_MESSAGE: Message = {
   id: "welcome-message",
   type: "ai",
@@ -527,6 +531,24 @@ export function ChatPage({
   onNavigateToLanding,
   onNavigateToPricing,
 }: ChatPageProps) {
+  const currentUser = safeJsonParse<{ authProvider?: string; businessName?: string; firstName?: string; lastName?: string }>(safeStorageGet("orrico_current_user"), {});
+  const isDemoUser = currentUser.authProvider === "demo";
+  const businessName = isDemoUser ? "Jai's Electronics" : currentUser.businessName || "Your Workspace";
+  const initials = isDemoUser ? "JS" : `${currentUser.firstName?.[0] || ""}${currentUser.lastName?.[0] || ""}`.toUpperCase() || "U";
+  const [sourceConnected, setSourceConnected] = useState(isDemoUser);
+  const [intelligenceProvider, setIntelligenceProvider] = useState("checking");
+  const [customerStats, setCustomerStats] = useState<QuickStat[]>([]);
+  useEffect(() => {
+    let active = true;
+    api.intelligenceStatus().then(status => { if (active) setIntelligenceProvider(status.configured ? status.provider : "unconfigured"); }).catch(() => { if (active) setIntelligenceProvider("unavailable"); });
+    api.currentDatabaseConnection().then(({ connection }) => {
+      if (active) setSourceConnected(isDemoUser || Boolean(connection));
+    }).catch(() => undefined);
+    if (!isDemoUser) api.dashboardSummary().then(summary => {
+      if (active && summary.available) setCustomerStats((summary.metrics || []).map(metric => ({ label: metric.title, value: metric.value, change: metric.change, positive: metric.positive })));
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [isDemoUser]);
   const [messages, setMessages] = useState<Message[]>([
     DEFAULT_WELCOME_MESSAGE,
   ]);
@@ -541,6 +563,7 @@ export function ChatPage({
   const interimTranscriptRef = useRef("");
   const shouldSendAfterRecordingRef = useRef(false);
   const manualStopRef = useRef(false);
+  const queryInFlightRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const memoryRef = useRef<ConversationMemory>({
@@ -548,7 +571,7 @@ export function ChatPage({
     intentCounts: {},
   });
 
-  const quickStats: QuickStat[] = [
+  const quickStats: QuickStat[] = isDemoUser ? [
     {
       label: "Today's Sales",
       value: "Rs 2,84,750",
@@ -568,6 +591,11 @@ export function ChatPage({
       change: "24 sold",
       positive: true,
     },
+  ] : customerStats.length ? customerStats : [
+    { label: "Sales", value: "—", change: "", positive: true },
+    { label: "Orders", value: "—", change: "", positive: true },
+    { label: "Customers", value: "—", change: "", positive: true },
+    { label: "Products", value: "—", change: "", positive: true },
   ];
 
   const quickQuestions = [
@@ -737,7 +765,7 @@ export function ChatPage({
           return;
         }
 
-        const restoredMessages = history.flatMap((entry) => {
+        const restoredMessages = history.filter(entry => entry.mode === "gemini").flatMap((entry) => {
           const createdAt = new Date(entry.createdAt);
 
           return [
@@ -872,7 +900,9 @@ export function ChatPage({
   }, []);
 
   const performSendMessage = async (message: string) => {
-    if (!message.trim()) return;
+    if (!message.trim() || queryInFlightRef.current) return;
+    if (message.length > 4000) { toast.error("Keep your question under 4,000 characters."); return; }
+    queryInFlightRef.current = true;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -888,13 +918,11 @@ export function ChatPage({
 
     try {
       const result = await api.sendChatMessage(message);
-      const responseContent = result.sql
-        ? `${result.reply}\n\nSQL executed:\n${result.sql}`
-        : result.reply;
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: "ai",
-        content: responseContent,
+        content: result.reply,
+        sql: result.sql,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, aiMessage]);
@@ -919,6 +947,7 @@ export function ChatPage({
         );
       }
     } finally {
+      queryInFlightRef.current = false;
       setIsTyping(false);
     }
   };
@@ -1095,35 +1124,115 @@ export function ChatPage({
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <div className="hidden md:flex md:w-80 md:shrink-0 md:flex-col md:overflow-hidden md:border-r md:border-border/70 md:bg-sidebar/84 md:backdrop-blur">
-        {renderSidebarContent()}
+    <div className="flex min-h-screen bg-background">
+      <div className="flex w-80 flex-col border-r bg-muted/20">
+        <div className="border-b p-6">
+          <Logo
+            iconClassName="h-6 w-6"
+            className="mb-4"
+            onClick={onNavigateToLanding}
+            clickable={!!onNavigateToLanding}
+          />
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback>{initials}</AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-medium">{businessName}</p>
+              <p className="text-sm text-muted-foreground">{isDemoUser ? "Demo Workspace" : "Customer Workspace"}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-b p-6">
+          <h3 className="mb-3 font-medium">Today's Overview</h3>
+          <div className="space-y-3">
+            {quickStats.map((stat, index) => (
+              <div key={index} className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  {stat.label}
+                </span>
+                <div className="text-right">
+                  <p className="font-medium">{stat.value}</p>
+                  <Badge
+                    variant={stat.positive ? "default" : "secondary"}
+                    className="text-xs"
+                  >
+                    {stat.change}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1 p-6">
+          <h3 className="mb-3 font-medium">Quick Questions</h3>
+          <div className="space-y-2">
+            {quickQuestions.map((question, index) => (
+              <Button
+                key={index}
+                variant="ghost"
+                size="sm"
+                className="h-auto w-full justify-start p-2 text-left"
+                onClick={() => handleSendMessage(question)}
+              >
+                <span className="text-xs">{question}</span>
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2 border-t p-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start"
+            onClick={onNavigateToDashboard}
+          >
+            <BarChart3 className="mr-2 h-4 w-4" />
+            Dashboard
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start"
+            onClick={onNavigateToSupport}
+          >
+            <HelpCircle className="mr-2 h-4 w-4" />
+            Support
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start"
+            onClick={handleSettings}
+          >
+            <Settings className="mr-2 h-4 w-4" />
+            Settings
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start"
+            onClick={onLogout}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </Button>
+        </div>
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="shrink-0 border-b border-border/70 bg-background/88 p-6 backdrop-blur">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="mb-3 flex items-center gap-2 md:hidden">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setIsMobileSidebarOpen(true)}
-                  aria-label="Open chat menu"
-                >
-                  <Menu className="h-4 w-4" />
-                </Button>
-                <ThemeToggle />
-              </div>
-              <h1 className="text-2xl font-semibold tracking-tight">{ASSISTANT_FULL_NAME}</h1>
-              <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
-                Ask {ASSISTANT_NAME} anything about your business data
-              </p>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="border-b bg-background p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold">Aska Chat</h1>
             </div>
-            <div className="hidden items-center gap-2 md:flex">
-              <Badge variant="secondary" className="flex items-center gap-1 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="flex items-center gap-1">
                 <Zap className="h-3 w-3" />
-                Connected
+                {isDemoUser ? "Demo Data" : sourceConnected ? "Connected" : "Connect Your Data"}
               </Badge>
               <ThemeToggle />
               <Button
@@ -1138,7 +1247,7 @@ export function ChatPage({
           </div>
         </div>
 
-        <ScrollArea ref={scrollAreaRef} className="min-h-0 flex-1 px-4 py-6 sm:px-6">
+        <ScrollArea ref={scrollAreaRef} className="flex-1 p-6">
           <div className="mx-auto max-w-4xl space-y-6">
             {messages.map((message) => (
               <div
@@ -1157,15 +1266,19 @@ export function ChatPage({
                   </AvatarFallback>
                 </Avatar>
                 <Card
-                  className={`max-w-[88%] sm:max-w-[80%] ${
+                  className={`min-w-0 max-w-[80%] overflow-hidden ${
                     message.type === "user"
-                      ? "border-primary/10 bg-primary text-primary-foreground shadow-[0_18px_40px_-28px_rgba(15,23,42,0.5)]"
-                      : "bg-card/88"
+                      ? "bg-primary text-primary-foreground"
+                      : ""
                   }`}
                 >
                   <CardContent className="p-4">
-                    <p className="break-words whitespace-pre-wrap">{message.content}</p>
-                    <p className="mt-3 text-[11px] uppercase tracking-[0.14em] opacity-60">
+                    {message.type === "ai" ? (
+                      <ChatAnswer content={message.content} sql={message.sql} />
+                    ) : (
+                      <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                    )}
+                    <p className="mt-2 text-xs opacity-70">
                       {message.timestamp.toLocaleTimeString()}
                     </p>
                   </CardContent>
@@ -1178,7 +1291,7 @@ export function ChatPage({
                 <Avatar className="h-8 w-8 shrink-0">
                   <AvatarFallback>{ASSISTANT_NAME}</AvatarFallback>
                 </Avatar>
-                <Card className="bg-card/88">
+                <Card>
                   <CardContent className="p-4">
                     <div className="flex gap-1">
                       <div className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground"></div>
@@ -1199,33 +1312,34 @@ export function ChatPage({
           </div>
         </ScrollArea>
 
-        <div className="shrink-0 border-t border-border/70 bg-background/88 p-4 backdrop-blur sm:p-6">
+        <div className="border-t bg-background p-6">
           <div className="mx-auto max-w-4xl">
-            <div className="rounded-[1.75rem] border border-border/70 bg-card/90 p-3 shadow-[0_18px_50px_-35px_rgba(15,23,42,0.35)] sm:p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="flex gap-4">
               <div className="relative flex-1">
                 <Input
-                  value={displayedInputValue}
+                  value={isRecording && interimTranscript
+                    ? `${inputValue}${inputValue && interimTranscript ? " " : ""}${interimTranscript}`
+                    : inputValue}
                   onChange={(event) => {
                     setInputValue(event.target.value);
                     setInterimTranscript("");
                   }}
                   placeholder={
                     hasSpeechSupport
-                      ? "Apne business data ke baare mein puchhiye ya mic use kijiye..."
-                      : "Apne business data ke baare mein puchhiye..."
+                      ? "Ask me about your business data or use the mic..."
+                      : "Ask me about your business data..."
                   }
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       handleSendMessage(displayedInputValue);
                     }
                   }}
-                  className="h-12 rounded-2xl border-border/70 bg-background/80 pr-12 text-base shadow-none"
+                  className="pr-12"
                 />
                 <Button
                   size="sm"
                   variant="ghost"
-                  className={`absolute right-2 top-2 h-8 w-8 rounded-full p-0 ${
+                  className={`absolute right-1 top-1 h-8 w-8 p-0 ${
                     isRecording ? "text-red-500" : ""
                   }`}
                   onClick={toggleRecording}
@@ -1235,16 +1349,15 @@ export function ChatPage({
                   }
                 >
                   {isRecording ? (
-                    <Mic className="h-4 w-4" />
-                  ) : (
                     <MicOff className="h-4 w-4" />
+                  ) : (
+                    <Mic className="h-4 w-4" />
                   )}
                 </Button>
               </div>
               <Button
                 onClick={() => handleSendMessage(displayedInputValue)}
-                disabled={!displayedInputValue.trim()}
-                className="h-12 w-full rounded-2xl px-5 sm:w-auto"
+                disabled={!inputValue.trim()}
               >
                 <Send className="h-4 w-4" />
               </Button>
@@ -1263,21 +1376,9 @@ export function ChatPage({
             <p className="mt-2 text-center text-xs text-muted-foreground">
               Try: "What were my sales yesterday?" or "Which items are low on stock?"
             </p>
-            <p className="mt-1 text-center text-xs text-muted-foreground">
-              For imported CSV tables, try: "count rows from sample_orders" or
-              "show top 5 by total from sample_orders"
-            </p>
-            </div>
           </div>
         </div>
       </div>
-
-      <Dialog open={isMobileSidebarOpen} onOpenChange={setIsMobileSidebarOpen}>
-        <DialogContent className="flex h-[85vh] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden p-0 md:hidden">
-          <DialogTitle className="sr-only">Chat Menu</DialogTitle>
-          {renderSidebarContent(true)}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

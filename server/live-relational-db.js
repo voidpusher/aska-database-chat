@@ -52,7 +52,7 @@ async function withPostgresClient(connection, callback) {
     password: connection.password,
     database: connection.databaseName,
     ssl: connection.ssl
-      ? { rejectUnauthorized: false }
+      ? { rejectUnauthorized: true }
       : undefined,
     connectionTimeoutMillis: 8000,
   });
@@ -75,7 +75,7 @@ async function withMysqlClient(connection, callback) {
     database: connection.databaseName,
     connectTimeout: 8000,
     ssl: connection.ssl
-      ? { rejectUnauthorized: false }
+      ? { rejectUnauthorized: true }
       : undefined,
   });
 

@@ -89,12 +89,12 @@ export function buildVerificationEmail({
 
   return {
     to: email,
-    subject: "Verify your Orrico account",
+    subject: "Verify your Aska account",
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
         <h2 style="margin-bottom: 8px;">Verify your account</h2>
         <p>Hello ${safeFirstName},</p>
-        <p>Your Orrico account is almost ready. Use the verification token below or open the link to activate your account.</p>
+        <p>Your Aska account is almost ready. Use the verification token below or open the link to activate your account.</p>
         <p style="margin: 20px 0;">
           <a href="${verifyLink}" style="display: inline-block; padding: 12px 18px; background: #111827; color: #ffffff; text-decoration: none; border-radius: 8px;">Verify Email</a>
         </p>
@@ -105,7 +105,7 @@ export function buildVerificationEmail({
     text: [
       `Hello ${firstName || "there"},`,
       "",
-      "Your Orrico account is almost ready.",
+      "Your Aska account is almost ready.",
       `Verification token: ${token}`,
       `Verification link: ${verifyLink}`,
       "",
@@ -130,12 +130,12 @@ export function buildPasswordResetEmail({
 
   return {
     to: email,
-    subject: "Reset your Orrico password",
+    subject: "Reset your Aska password",
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
         <h2 style="margin-bottom: 8px;">Reset your password</h2>
         <p>Hello ${safeFirstName},</p>
-        <p>We received a request to reset your Orrico password. Use the token below or open the reset link.</p>
+        <p>We received a request to reset your Aska password. Use the token below or open the reset link.</p>
         <p style="margin: 20px 0;">
           <a href="${resetLink}" style="display: inline-block; padding: 12px 18px; background: #111827; color: #ffffff; text-decoration: none; border-radius: 8px;">Reset Password</a>
         </p>
@@ -146,7 +146,7 @@ export function buildPasswordResetEmail({
     text: [
       `Hello ${firstName || "there"},`,
       "",
-      "We received a request to reset your Orrico password.",
+      "We received a request to reset your Aska password.",
       `Reset token: ${token}`,
       `Reset link: ${resetLink}`,
       "",

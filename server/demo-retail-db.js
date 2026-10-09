@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 
 const isVercelRuntime = Boolean(process.env.VERCEL);
-const dataDirectory = isVercelRuntime
+const dataDirectory = process.env.APP_DATA_DIRECTORY ? path.resolve(process.env.APP_DATA_DIRECTORY) : isVercelRuntime
   ? path.join(os.tmpdir(), "orrico-data")
   : path.resolve("server", "data");
 const demoDatabasePath = path.join(
@@ -430,22 +430,34 @@ function parseCsvLine(line) {
 }
 
 function parseCsvContent(csvContent) {
-  const lines = String(csvContent || "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .split("\n")
-    .filter((line) => line.trim().length > 0);
-
-  if (lines.length < 2) {
+  const content = String(csvContent || "").replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const records = [];
+  let record = [], cell = "", quoted = false;
+  for (let index = 0; index < content.length; index++) {
+    const char = content[index];
+    if (char === '"') {
+      if (quoted && content[index + 1] === '"') { cell += '"'; index++; }
+      else if (quoted || cell.trim() === "") quoted = !quoted;
+      else throw new Error("CSV contains an unexpected quote.");
+    } else if (char === "," && !quoted) { record.push(cell.trim()); cell = ""; }
+    else if (char === "\n" && !quoted) {
+      record.push(cell.trim());
+      if (record.some(value => value !== "")) records.push(record);
+      record = []; cell = "";
+    } else cell += char;
+  }
+  if (quoted) throw new Error("CSV contains an unclosed quoted value.");
+  record.push(cell.trim());
+  if (record.some(value => value !== "")) records.push(record);
+  if (records.length < 2) {
     throw new Error("CSV file must include a header row and at least one data row.");
   }
-
-  const headers = parseCsvLine(lines[0]).map((header, index) =>
+  const headers = records[0].map((header, index) =>
     normalizeIdentifier(header, `column_${index + 1}`),
   );
-
-  const rows = lines.slice(1).map((line) => {
-    const cells = parseCsvLine(line);
+  if (new Set(headers).size !== headers.length) throw new Error("CSV headers must have unique names after normalization.");
+  const rows = records.slice(1).map((cells, index) => {
+    if (cells.length !== headers.length) throw new Error(`CSV row ${index + 2} has ${cells.length} values; expected ${headers.length}.`);
     return headers.reduce((row, header, index) => {
       row[header] = cells[index] ?? "";
       return row;
@@ -497,10 +509,11 @@ export function importCsvDataset(
       .map((column) => `"${column.name}" ${column.type}`)
       .join(", ");
 
+    database.exec("BEGIN");
     database.exec(`DROP TABLE IF EXISTS ${quotedTableName}`);
     database.exec(`
       CREATE TABLE ${quotedTableName} (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ${columns.some(column => column.name === "id") ? "" : "id INTEGER PRIMARY KEY AUTOINCREMENT,"}
         ${columnDefinitions}
       )
     `);
@@ -511,7 +524,6 @@ export function importCsvDataset(
         .join(", ")})
       VALUES (${placeholders})
     `);
-    database.exec("BEGIN");
 
     rows.forEach((row) => {
       const values = columns.map((column) => {

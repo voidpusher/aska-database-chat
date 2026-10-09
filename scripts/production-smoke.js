@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
 const baseUrl = String(
-  process.env.SMOKE_BASE_URL || "https://retail-shopkeeper.vercel.app",
+  process.env.SMOKE_BASE_URL || "http://localhost:4000",
 ).replace(/\/+$/, "");
 
 let sessionCookie = "";

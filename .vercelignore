@@ -11,6 +11,11 @@ Desktop.ini
 portable-git/
 gh-cli/
 Retail-Shopkeeper-App-current-code/
+.env
+.env.*
+!.env.example
+server/data/
+lead-scraper/
 
 *.log
 npm-debug.log*

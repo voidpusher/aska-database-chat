@@ -11,23 +11,9 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("light");
-
-  useEffect(() => {
-    const savedTheme = safeStorageGet("orrico_theme") as Theme | null;
-
-    if (savedTheme === "light" || savedTheme === "dark") {
-      setTheme(savedTheme);
-      return;
-    }
-
-    if (
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches
-    ) {
-      setTheme("dark");
-    }
-  }, []);
+  const [theme, setTheme] = useState<Theme>(() =>
+    safeStorageGet("aska_theme") === "light" ? "light" : "dark",
+  );
 
   useEffect(() => {
     const root = document.documentElement;
@@ -36,7 +22,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } else {
       root.classList.remove("dark");
     }
-    safeStorageSet("orrico_theme", theme);
+    safeStorageSet("aska_theme", theme);
   }, [theme]);
 
   const toggleTheme = () => {

@@ -49,7 +49,7 @@ export function Features() {
   ];
 
   return (
-    <section id="features" className="py-20">
+    <section id="features" className="py-20 bg-muted/30">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
           <h2 className="text-3xl lg:text-5xl font-bold mb-4">
@@ -62,17 +62,12 @@ export function Features() {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {features.map((feature, index) => (
-            <Card key={index} className="border-border/70 bg-card/88 transition-transform duration-200 hover:-translate-y-1">
-              <CardHeader className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+            <Card key={index} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardHeader>
+                <div className={`w-12 h-12 rounded-lg bg-muted flex items-center justify-center mb-4`}>
                   <feature.icon className={`w-6 h-6 ${feature.color}`} />
-                  </div>
-                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    0{index + 1}
-                  </span>
                 </div>
                 <CardTitle className="text-xl">{feature.title}</CardTitle>
               </CardHeader>

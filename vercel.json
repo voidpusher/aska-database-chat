@@ -7,7 +7,7 @@
   "cleanUrls": false,
   "functions": {
     "api/index.js": {
-      "maxDuration": 10
+      "maxDuration": 120
     }
   },
   "routes": [

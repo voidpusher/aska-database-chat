@@ -139,6 +139,12 @@ export function DatabaseConnectionPage({
         setExistingConnection(result.connection);
         if (result.connection?.databaseType) {
           setSelectedDatabase(result.connection.databaseType);
+          form.setValue("databaseType", result.connection.databaseType);
+          form.setValue("databaseName", result.connection.databaseName || "");
+          form.setValue("filePath", result.connection.filePath || "");
+          form.setValue("host", result.connection.host || "");
+          form.setValue("port", result.connection.port || "");
+          form.setValue("username", result.connection.username || "");
         }
       })
       .catch(() => {
@@ -224,7 +230,7 @@ export function DatabaseConnectionPage({
       }, 1000);
     } catch (error) {
       setIsLoading(false);
-      toast.error("Connection failed. Please check your credentials.");
+      toast.error(error instanceof Error ? error.message : "Connection failed. Please check your credentials.");
     }
   };
 
@@ -276,6 +282,10 @@ export function DatabaseConnectionPage({
       toast.error("Select a CSV file first.");
       return;
     }
+    if (csvFile.size > 1_500_000) {
+      toast.error("Choose a CSV smaller than 1.5 MB.");
+      return;
+    }
 
     setIsImportingCsv(true);
 
@@ -292,7 +302,14 @@ export function DatabaseConnectionPage({
         rowCount: result.rowCount,
       });
       setCsvTableName(result.tableName);
-      form.setValue("databaseName", form.getValues("databaseName") || "imported_retail_data");
+      const current = await api.currentDatabaseConnection();
+      setExistingConnection(current.connection);
+      if (current.connection) {
+        form.setValue("databaseName", current.connection.databaseName || "");
+        form.setValue("filePath", current.connection.filePath || "");
+        form.setValue("databaseType", current.connection.databaseType);
+        setSelectedDatabase(current.connection.databaseType);
+      }
       toast.success(
         `Imported ${result.rowCount} rows into ${result.tableName}. You can query it from chat now.`,
       );
@@ -306,9 +323,9 @@ export function DatabaseConnectionPage({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/40">
-      <header className="border-b border-border/70 bg-background/85 backdrop-blur-xl">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
+      <header className="border-b bg-background/95 backdrop-blur">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Logo />
           {onLogout && (
             <Button variant="ghost" onClick={onLogout}>
@@ -318,18 +335,18 @@ export function DatabaseConnectionPage({
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-12 lg:py-16">
+      <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto space-y-8">
           <div className="text-center space-y-4">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
               <Database className="w-8 h-8 text-primary" />
             </div>
-            <h1 className="text-4xl font-semibold tracking-tight">
+            <h1 className="text-3xl">
               {isDemoUser
                 ? `Welcome${hasExistingConnection ? " back" : ""}, ${currentUser.firstName}!`
                 : `Set up your shop${hasExistingConnection ? "" : ""}, ${currentUser.firstName}!`}
             </h1>
-            <p className="mx-auto max-w-2xl text-lg leading-8 text-muted-foreground lg:text-xl">
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               {hasExistingConnection
                 ? "You already have a database connection configured. You can continue with it or update the connection below."
                 : isDemoUser
@@ -340,7 +357,7 @@ export function DatabaseConnectionPage({
           </div>
 
           {hasExistingConnection && (
-            <Alert className="border-emerald-200 bg-emerald-50/90 shadow-sm">
+            <Alert className="bg-green-50 border-green-200">
               <Check className="h-4 w-4 text-green-600" />
               <AlertDescription className="flex items-center justify-between">
                 <div>
@@ -362,7 +379,7 @@ export function DatabaseConnectionPage({
             </Alert>
           )}
 
-          <Card className="border-border/70 bg-card/92 shadow-[0_30px_80px_-36px_rgba(15,23,42,0.4)]">
+          <Card className="shadow-xl">
             <CardHeader>
               <CardTitle className="text-2xl">
                 {hasExistingConnection ? "Reconfigure Database Connection" : "Connect Your Database"}
@@ -391,7 +408,7 @@ export function DatabaseConnectionPage({
                         />
                         <Label
                           htmlFor={db.id}
-                          className="flex cursor-pointer flex-col items-start gap-3 rounded-2xl border border-border/80 bg-background/75 p-4 transition-all hover:-translate-y-0.5 hover:bg-accent/70 hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:shadow-[0_18px_40px_-28px_rgba(15,23,42,0.35)]"
+                          className="flex flex-col items-start gap-3 rounded-lg border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer transition-all"
                         >
                           <div className="flex items-center gap-3 w-full">
                             <span className="inline-flex h-10 w-10 items-center justify-center rounded-md border bg-muted text-sm font-semibold tracking-wide">
@@ -562,7 +579,7 @@ export function DatabaseConnectionPage({
                       </Button>
                     </div>
 
-                    <Alert className="border-sky-200 bg-sky-50/90">
+                    <Alert className="bg-blue-50 border-blue-200">
                       <AlertDescription className="text-sm">
                         SQLite is the working connector right now. Use the demo
                         database or point to a local SQLite file to query real
@@ -610,11 +627,11 @@ export function DatabaseConnectionPage({
                         : "Test SQLite Connection"}
                     </Button>
 
-                    <div className="space-y-4 rounded-[1.5rem] border border-border/70 bg-muted/40 p-5">
+                    <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
                       <div className="space-y-1">
                         <h4 className="font-medium">Import CSV Data</h4>
                         <p className="text-sm text-muted-foreground">
-                          Upload business data as CSV and Orrico will create a SQLite
+                          Upload business data as CSV and Aska will create a SQLite
                           table that chat can query directly.
                         </p>
                       </div>
@@ -656,7 +673,7 @@ export function DatabaseConnectionPage({
                       </Button>
 
                       {lastImportResult && (
-                        <Alert className="border-emerald-200 bg-emerald-50/90">
+                        <Alert className="bg-green-50 border-green-200">
                           <AlertDescription className="text-sm">
                             Imported <strong>{lastImportResult.rowCount}</strong> rows
                             into <strong>{lastImportResult.tableName}</strong>. Ask chat
@@ -695,7 +712,7 @@ export function DatabaseConnectionPage({
           </Card>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <Card className="border-border/70 bg-card/82">
+            <Card className="bg-muted/50">
               <CardContent className="pt-6">
                 <div className="flex gap-4">
                   <div className="flex-shrink-0">
@@ -714,7 +731,7 @@ export function DatabaseConnectionPage({
               </CardContent>
             </Card>
 
-            <Card className="border-sky-200 bg-sky-50/85">
+            <Card className="bg-blue-50 border-blue-200">
               <CardContent className="pt-6">
                 <div className="flex gap-4">
                   <div className="flex-shrink-0">

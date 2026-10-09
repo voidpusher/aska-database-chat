@@ -1,0 +1,30 @@
+.aska-answer { min-width: 0; line-height: 1.65; overflow-wrap: anywhere; }
+.aska-answer > :first-child { margin-top: 0; }
+.aska-answer > :last-child { margin-bottom: 0; }
+.aska-answer p { margin: 0 0 12px; white-space: pre-wrap; }
+.aska-answer h1, .aska-answer h2, .aska-answer h3, .aska-answer h4,
+.aska-answer h5, .aska-answer h6 { margin: 20px 0 8px; font-size: 1rem; font-weight: 600; line-height: 1.4; }
+.aska-answer h1 { font-size: 1.2rem; }
+.aska-answer h2 { font-size: 1.1rem; }
+.aska-answer strong { font-weight: 600; }
+.aska-answer ul, .aska-answer ol { margin: 8px 0 14px; padding-left: 24px; }
+.aska-answer ul { list-style: disc; }
+.aska-answer ol { list-style: decimal; }
+.aska-answer li { margin: 4px 0; }
+.aska-answer li p { margin-bottom: 4px; }
+.aska-answer a { text-decoration: underline; text-underline-offset: 3px; }
+.aska-answer blockquote { border-left: 3px solid var(--border); padding-left: 12px; color: var(--muted-foreground); margin: 12px 0; }
+.aska-answer hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
+.aska-answer code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.85em; background: var(--muted); padding: 2px 5px; border-radius: 4px; }
+.aska-answer pre { max-width: 100%; overflow-x: auto; padding: 12px; margin: 12px 0; border: 1px solid var(--border); border-radius: 8px; background: var(--muted); white-space: pre; }
+.aska-answer pre code { padding: 0; background: transparent; }
+.aska-answer-table { width: 100%; max-width: 100%; overflow-x: auto; margin: 14px 0; border: 1px solid var(--border); border-radius: 8px; }
+.aska-answer table { width: 100%; border-collapse: collapse; font-size: 0.875rem; line-height: 1.5; }
+.aska-answer th, .aska-answer td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; min-width: 88px; }
+.aska-answer th { font-weight: 600; background: var(--muted); white-space: nowrap; }
+.aska-answer tbody tr:last-child td { border-bottom: 0; }
+.aska-answer tbody tr:hover { background: var(--muted); }
+.aska-answer-query { border-top: 1px solid var(--border); margin-top: 16px; padding-top: 10px; }
+.aska-answer-query summary { cursor: pointer; font-size: 0.8rem; font-weight: 500; color: var(--muted-foreground); }
+.aska-answer-query pre { margin-bottom: 0; }
+.aska-answer-table:focus-visible, .aska-answer-query summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }

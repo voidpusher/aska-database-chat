@@ -52,13 +52,13 @@ export function SupportPage({
             Need a hand with your store setup?
           </h1>
           <p className="mx-auto max-w-2xl text-lg leading-8 text-muted-foreground">
-            Reach the Orrico team for onboarding help, reporting questions, or
+            Reach the Aska team for onboarding help, reporting questions, or
             day-to-day product support across your retail workflow.
           </p>
         </div>
 
         <div className="mb-12 grid gap-6 md:grid-cols-3">
-          <Card className="bg-card/90 transition-transform duration-200 hover:-translate-y-1">
+          <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center gap-2">
                 <MessageCircle className="h-6 w-6 text-primary" />
@@ -69,9 +69,9 @@ export function SupportPage({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="mb-4 flex items-center gap-2">
+              <div className="flex items-center gap-2 mb-4">
                 <Badge variant="secondary">
-                  <Clock className="mr-1 h-3 w-3" />
+                  <Clock className="h-3 w-3 mr-1" />
                   24/7 Available
                 </Badge>
               </div>
@@ -79,7 +79,7 @@ export function SupportPage({
             </CardContent>
           </Card>
 
-          <Card className="bg-card/90 transition-transform duration-200 hover:-translate-y-1">
+          <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Phone className="h-6 w-6 text-primary" />
@@ -90,9 +90,9 @@ export function SupportPage({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="mb-4 flex items-center gap-2">
+              <div className="flex items-center gap-2 mb-4">
                 <Badge variant="secondary">
-                  <Clock className="mr-1 h-3 w-3" />
+                  <Clock className="h-3 w-3 mr-1" />
                   Mon-Fri 9AM-6PM
                 </Badge>
               </div>
@@ -102,7 +102,7 @@ export function SupportPage({
             </CardContent>
           </Card>
 
-          <Card className="bg-card/90 transition-transform duration-200 hover:-translate-y-1">
+          <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Mail className="h-6 w-6 text-primary" />
@@ -113,9 +113,9 @@ export function SupportPage({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="mb-4 flex items-center gap-2">
+              <div className="flex items-center gap-2 mb-4">
                 <Badge variant="secondary">
-                  <Clock className="mr-1 h-3 w-3" />
+                  <Clock className="h-3 w-3 mr-1" />
                   24hr Response
                 </Badge>
               </div>
@@ -192,7 +192,7 @@ export function SupportPage({
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Orrico supports modern retail connection workflows through the
+                  Aska supports modern retail connection workflows through the
                   setup page. Choose your preferred source, review the required
                   fields, and follow the guided connection steps.
                 </p>
@@ -202,7 +202,7 @@ export function SupportPage({
             <Card className="bg-card/90">
               <CardHeader>
                 <CardTitle>
-                  What kind of voice and text input does Orrico support?
+                  What kind of voice and text input does Aska support?
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -230,7 +230,7 @@ export function SupportPage({
             <Card className="bg-card/90">
               <CardHeader>
                 <CardTitle>
-                  Can I explore Orrico before connecting my own data?
+                  Can I explore Aska before connecting my own data?
                 </CardTitle>
               </CardHeader>
               <CardContent>

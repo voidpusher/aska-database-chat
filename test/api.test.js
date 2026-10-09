@@ -11,11 +11,13 @@ const tempRoot = fs.mkdtempSync(
 
 process.env.NODE_ENV = "test";
 process.env.APP_DATA_DIRECTORY = tempRoot;
+process.env.GEMINI_API_KEY = "";
 
 const appModuleUrl = `${pathToFileURL(
   path.resolve("server", "app.js"),
 ).href}?test=${Date.now()}`;
 const { app } = await import(appModuleUrl);
+const { executeReadOnlyQuery } = await import("../server/query-runtime.js");
 
 const server = app.listen(0);
 const address = server.address();
@@ -183,8 +185,9 @@ test("password reset updates the account password", async () => {
 });
 
 test("dashboard APIs and write paths work for the SQLite/demo flow", async () => {
-  const email = `dashboard-${Date.now()}@example.com`;
-  const token = await signupAndVerify(email);
+  const login = await request("/auth/login", { method: "POST", body: JSON.stringify({ email: "demo@orrico.com", password: "demo123" }) });
+  assert.equal(login.status, 200);
+  const token = login.body.token;
   const authHeaders = {
     Authorization: `Bearer ${token}`,
   };
@@ -301,4 +304,64 @@ test("dashboard APIs and write paths work for the SQLite/demo flow", async () =>
     },
   );
   assert.equal(deleteProduct.status, 400);
+});
+
+test("cookie logout revokes the session on the server", async () => {
+  const token = await signupAndVerify(`cookie-${Date.now()}@example.com`);
+  const headers = { Cookie: `orrico_session=${token}` };
+  assert.equal((await request("/auth/session", { headers })).status, 200);
+  assert.equal((await request("/auth/logout", { method: "POST", headers })).status, 204);
+  assert.equal((await request("/auth/session", { headers })).status, 401);
+});
+
+test("customer CSV imports stay isolated and missing Gemini credentials return no fabricated chat history", async () => {
+  const tokenA = await signupAndVerify(`csv-a-${Date.now()}@example.com`);
+  const tokenB = await signupAndVerify(`csv-b-${Date.now()}@example.com`);
+  const headersA = { Authorization: `Bearer ${tokenA}` };
+  const headersB = { Authorization: `Bearer ${tokenB}` };
+  assert.equal((await request("/database/current", { headers: headersA })).body.connection, null);
+  assert.equal((await request("/dashboard/summary", { headers: headersA })).status, 400);
+  for (const [headers, csvContent] of [[headersA, 'id,item,revenue,cost\n1,Alpha,20,5\n2,Beta,30,10'], [headersB, 'id,item,revenue,cost\n1,Other,999,1']]) {
+    const imported = await request("/database/import-csv", { method: "POST", headers, body: JSON.stringify({ csvContent, tableName: "metrics", fileName: "metrics.csv" }) });
+    assert.equal(imported.status, 201);
+  }
+  const currentA = (await request("/database/current", { headers: headersA })).body.connection;
+  const currentB = (await request("/database/current", { headers: headersB })).body.connection;
+  assert.notEqual(currentA.filePath, currentB.filePath);
+  const schema = await request("/database/schema", { headers: headersA });
+  assert.deepEqual(schema.body.schema.map(table => table.table), ["metrics"]);
+  const ask = (headers, message) => request("/chat/message", { method: "POST", headers, body: JSON.stringify({ message }) });
+  const sumA = await ask(headersA, "What is the total revenue in metrics?");
+  assert.equal(sumA.status, 503);
+  assert.match(sumA.body.error, /Gemini API key/);
+  assert.equal(sumA.body.reply, undefined);
+  assert.equal((await ask(headersB, "What is the total revenue in metrics?")).status, 503);
+  assert.equal((await executeReadOnlyQuery(currentA, "SELECT SUM(revenue) AS total FROM metrics"))[0].total, 50);
+  assert.equal((await executeReadOnlyQuery(currentB, "SELECT SUM(revenue) AS total FROM metrics"))[0].total, 999);
+  assert.equal((await request("/chat/history", { headers: headersA })).body.messages.length, 0);
+  const intelligence = (await request("/intelligence/status", { headers: headersA })).body;
+  assert.equal(intelligence.provider, "gemini");
+  assert.equal(intelligence.configured, false);
+  assert.equal((await ask(headersA, "x".repeat(4001))).status, 400);
+  await assert.rejects(executeReadOnlyQuery(currentA, "WITH removed AS (DELETE FROM metrics RETURNING *) SELECT * FROM removed"), /read-only/);
+  await assert.rejects(executeReadOnlyQuery(currentA, "SELECT * FROM metrics; DROP TABLE metrics"), /read-only/);
+  assert.equal((await executeReadOnlyQuery(currentA, "SELECT COUNT(*) AS total FROM metrics"))[0].total, 2);
+  assert.equal((await request("/database/connect", { method: "POST", headers: headersA, body: JSON.stringify({ databaseType: "sqlite", filePath: currentB.filePath }) })).status, 400);
+});
+
+test("CSV accepts multiline quoted fields and invalid replacements preserve the original table", async () => {
+  const token = await signupAndVerify(`csv-quotes-${Date.now()}@example.com`);
+  const headers = { Authorization: `Bearer ${token}` };
+  const upload = csvContent => request("/database/import-csv", { method: "POST", headers, body: JSON.stringify({ csvContent, tableName: "notes", fileName: "notes.csv" }) });
+  assert.equal((await upload('name,note\nAlpha,"Two\nlines, and ""quotes"""')).status, 201);
+  const current = (await request("/database/current", { headers })).body.connection;
+  const rows = await executeReadOnlyQuery(current, "SELECT note FROM notes");
+  assert.equal(rows[0].note, 'Two\nlines, and "quotes"');
+  assert.equal((await upload("name,name\nAlpha,Beta")).status, 400);
+  assert.equal((await executeReadOnlyQuery(current, "SELECT COUNT(*) AS total FROM notes"))[0].total, 1);
+});
+
+test("unknown API routes return JSON and intelligence status requires authentication", async () => {
+  assert.equal((await request("/intelligence/status")).status, 401);
+  assert.equal((await request("/does-not-exist")).status, 404);
 });

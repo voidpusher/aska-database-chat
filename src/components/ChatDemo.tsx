@@ -100,7 +100,7 @@ export function ChatDemo() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Bot className="h-5 w-5 text-primary" />
-                  Orrico Assistant
+                  Aska Assistant
                   <Badge variant="secondary" className="ml-auto">
                     Demo
                   </Badge>

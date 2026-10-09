@@ -138,7 +138,11 @@ function openSqliteDatabase() {
       avatar_url TEXT,
       auth_provider TEXT NOT NULL,
       created_at TEXT NOT NULL,
-      email_verified_at TEXT
+      email_verified_at TEXT,
+      stripe_customer_id TEXT,
+      stripe_subscription_id TEXT,
+      stripe_plan_key TEXT,
+      stripe_subscription_status TEXT
     );
 
     CREATE TABLE IF NOT EXISTS sessions (
@@ -194,12 +198,12 @@ function openSqliteDatabase() {
       created_at TEXT NOT NULL
     );
   `);
-  ensureSqliteColumn(
-    database,
-    "users",
-    "email_verified_at",
-    "TEXT",
-  );
+  ensureSqliteColumn(database, "users", "email_verified_at", "TEXT");
+  ensureSqliteColumn(database, "users", "stripe_customer_id", "TEXT");
+  ensureSqliteColumn(database, "users", "stripe_subscription_id", "TEXT");
+  ensureSqliteColumn(database, "users", "stripe_plan_key", "TEXT");
+  ensureSqliteColumn(database, "users", "stripe_subscription_status", "TEXT");
+  ensureSqliteColumn(database, "chat_history", "conversation_id", "TEXT");
 
   return database;
 }
@@ -229,17 +233,11 @@ function ensureSqliteColumn(
 function mapSqliteUsers(database) {
   const rows = database.prepare(`
     SELECT
-      id,
-      first_name,
-      last_name,
-      email,
-      business_name,
-      password_hash,
-      legacy_password,
-      avatar_url,
-      auth_provider,
-      created_at,
-      email_verified_at
+      id, first_name, last_name, email, business_name,
+      password_hash, legacy_password, avatar_url, auth_provider,
+      created_at, email_verified_at,
+      stripe_customer_id, stripe_subscription_id,
+      stripe_plan_key, stripe_subscription_status
     FROM users
     ORDER BY created_at ASC
   `).all();
@@ -256,6 +254,10 @@ function mapSqliteUsers(database) {
     authProvider: row.auth_provider,
     createdAt: row.created_at,
     emailVerifiedAt: row.email_verified_at || undefined,
+    stripeCustomerId: row.stripe_customer_id || undefined,
+    stripeSubscriptionId: row.stripe_subscription_id || undefined,
+    stripePlanKey: row.stripe_plan_key || undefined,
+    stripeSubscriptionStatus: row.stripe_subscription_status || undefined,
   }));
 }
 
@@ -287,7 +289,7 @@ function mapSqliteConnections(database) {
 
 function mapSqliteChatHistory(database) {
   const rows = database.prepare(`
-    SELECT id, user_id, message, reply, mode, created_at
+    SELECT id, user_id, message, reply, mode, created_at, conversation_id
     FROM chat_history
     ORDER BY created_at ASC
   `).all();
@@ -298,6 +300,7 @@ function mapSqliteChatHistory(database) {
     message: row.message,
     reply: row.reply,
     mode: row.mode,
+    conversationId: row.conversation_id,
     createdAt: row.created_at,
   }));
 }
@@ -366,18 +369,12 @@ function persistSqliteSnapshot(database, nextData) {
 
     const insertUser = database.prepare(`
       INSERT INTO users (
-        id,
-        first_name,
-        last_name,
-        email,
-        business_name,
-        password_hash,
-        legacy_password,
-        avatar_url,
-        auth_provider,
-        created_at,
-        email_verified_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, first_name, last_name, email, business_name,
+        password_hash, legacy_password, avatar_url, auth_provider,
+        created_at, email_verified_at,
+        stripe_customer_id, stripe_subscription_id,
+        stripe_plan_key, stripe_subscription_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertSession = database.prepare(`
       INSERT INTO sessions (
@@ -402,8 +399,9 @@ function persistSqliteSnapshot(database, nextData) {
         message,
         reply,
         mode,
-        created_at
-      ) VALUES (?, ?, ?, ?, ?, ?)
+        created_at,
+        conversation_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     const insertPasswordResetToken = database.prepare(`
       INSERT INTO password_reset_tokens (
@@ -437,6 +435,10 @@ function persistSqliteSnapshot(database, nextData) {
         user.authProvider || "password",
         user.createdAt,
         user.emailVerifiedAt || null,
+        user.stripeCustomerId || null,
+        user.stripeSubscriptionId || null,
+        user.stripePlanKey || null,
+        user.stripeSubscriptionStatus || null,
       );
     }
 
@@ -466,6 +468,7 @@ function persistSqliteSnapshot(database, nextData) {
         entry.reply,
         entry.mode,
         entry.createdAt,
+        entry.conversationId || null,
       );
     }
 
@@ -572,7 +575,11 @@ async function initializePostgres(client) {
       avatar_url TEXT,
       auth_provider TEXT NOT NULL,
       created_at TEXT NOT NULL,
-      email_verified_at TEXT
+      email_verified_at TEXT,
+      stripe_customer_id TEXT,
+      stripe_subscription_id TEXT,
+      stripe_plan_key TEXT,
+      stripe_subscription_status TEXT
     );
 
     CREATE TABLE IF NOT EXISTS ${PG_TABLES.sessions} (
@@ -622,6 +629,7 @@ async function initializePostgres(client) {
       user_agent TEXT,
       created_at TEXT NOT NULL
     );
+    ALTER TABLE ${PG_TABLES.chatHistory} ADD COLUMN IF NOT EXISTS conversation_id TEXT;
   `);
 }
 
@@ -653,19 +661,13 @@ async function persistPostgresSnapshot(client, nextData) {
       await client.query(
         `
           INSERT INTO ${PG_TABLES.users} (
-            id,
-            first_name,
-            last_name,
-            email,
-            business_name,
-            password_hash,
-            legacy_password,
-            avatar_url,
-            auth_provider,
-            created_at,
-            email_verified_at
+            id, first_name, last_name, email, business_name,
+            password_hash, legacy_password, avatar_url, auth_provider,
+            created_at, email_verified_at,
+            stripe_customer_id, stripe_subscription_id,
+            stripe_plan_key, stripe_subscription_status
           )
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
         `,
         [
           user.id,
@@ -679,6 +681,10 @@ async function persistPostgresSnapshot(client, nextData) {
           user.authProvider || "password",
           user.createdAt,
           user.emailVerifiedAt || null,
+          user.stripeCustomerId || null,
+          user.stripeSubscriptionId || null,
+          user.stripePlanKey || null,
+          user.stripeSubscriptionStatus || null,
         ],
       );
     }
@@ -730,8 +736,9 @@ async function persistPostgresSnapshot(client, nextData) {
             message,
             reply,
             mode,
-            created_at
-          ) VALUES ($1,$2,$3,$4,$5,$6)
+            created_at,
+            conversation_id
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7)
         `,
         [
           entry.id,
@@ -740,6 +747,7 @@ async function persistPostgresSnapshot(client, nextData) {
           entry.reply,
           entry.mode,
           entry.createdAt,
+          entry.conversationId || null,
         ],
       );
     }
@@ -811,7 +819,18 @@ async function persistPostgresSnapshot(client, nextData) {
   }
 }
 
+async function ensurePostgresColumn(client, table, column, colType) {
+  await client.query(
+    `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${column} ${colType}`
+  );
+}
+
 async function migratePostgresIfNeeded(client) {
+  await ensurePostgresColumn(client, PG_TABLES.users, "stripe_customer_id", "TEXT");
+  await ensurePostgresColumn(client, PG_TABLES.users, "stripe_subscription_id", "TEXT");
+  await ensurePostgresColumn(client, PG_TABLES.users, "stripe_plan_key", "TEXT");
+  await ensurePostgresColumn(client, PG_TABLES.users, "stripe_subscription_status", "TEXT");
+
   const currentUserCount = await getExistingPostgresUserCount(client);
 
   if (currentUserCount > 0) {
@@ -848,17 +867,11 @@ async function readPostgresData() {
     ] = await Promise.all([
       client.query(`
         SELECT
-          id,
-          first_name,
-          last_name,
-          email,
-          business_name,
-          password_hash,
-          legacy_password,
-          avatar_url,
-          auth_provider,
-          created_at,
-          email_verified_at
+          id, first_name, last_name, email, business_name,
+          password_hash, legacy_password, avatar_url, auth_provider,
+          created_at, email_verified_at,
+          stripe_customer_id, stripe_subscription_id,
+          stripe_plan_key, stripe_subscription_status
         FROM ${PG_TABLES.users}
         ORDER BY created_at ASC
       `),
@@ -873,7 +886,7 @@ async function readPostgresData() {
         ORDER BY updated_at ASC
       `),
       client.query(`
-        SELECT id, user_id, message, reply, mode, created_at
+        SELECT id, user_id, message, reply, mode, created_at, conversation_id
         FROM ${PG_TABLES.chatHistory}
         ORDER BY created_at ASC
       `),
@@ -908,6 +921,10 @@ async function readPostgresData() {
         authProvider: row.auth_provider,
         createdAt: row.created_at,
         emailVerifiedAt: row.email_verified_at || undefined,
+        stripeCustomerId: row.stripe_customer_id || undefined,
+        stripeSubscriptionId: row.stripe_subscription_id || undefined,
+        stripePlanKey: row.stripe_plan_key || undefined,
+        stripeSubscriptionStatus: row.stripe_subscription_status || undefined,
       })),
       sessions: sessionsResult.rows.map((row) => ({
         token: row.token,
@@ -925,6 +942,7 @@ async function readPostgresData() {
         message: row.message,
         reply: row.reply,
         mode: row.mode,
+        conversationId: row.conversation_id,
         createdAt: row.created_at,
       })),
       passwordResetTokens: passwordResetTokensResult.rows.map((row) => ({

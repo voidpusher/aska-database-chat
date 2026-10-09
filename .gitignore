@@ -30,3 +30,5 @@ server/data/*.json
 server/data/*.sqlite
 server/data/*.db
 server/data/*.sqlite-journal
+server/data/workspaces/
+server/data/preview/

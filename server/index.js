@@ -51,7 +51,7 @@ if (import.meta.url === currentModuleUrl) {
       storeHealth,
     });
 
-    console.log(`Orrico API listening on http://localhost:${port}`);
+    console.log(`Aska API listening on http://localhost:${port}`);
     console.log(
       JSON.stringify({
         level: "info",

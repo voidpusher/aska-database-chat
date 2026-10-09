@@ -40,6 +40,7 @@ export interface StoredChatHistoryItem {
   reply: string;
   mode: string;
   createdAt: string;
+  conversationId?: string;
 }
 
 export interface CsvImportResponse {
@@ -79,52 +80,6 @@ function getDemoUser() {
     authProvider: "demo",
     createdAt: new Date().toISOString(),
   };
-}
-
-function normalizeMessage(message: string) {
-  return message.toLowerCase().replace(/[^\w\s]/g, " ").trim();
-}
-
-function buildLocalChatReply(message: string) {
-  const normalizedMessage = normalizeMessage(message);
-
-  if (
-    normalizedMessage.includes("sales yesterday") ||
-    normalizedMessage.includes("yesterday sales")
-  ) {
-    return "Yesterday your store closed at Rs 2,84,750 across 43 orders. Mobile accessories and power banks led the strongest movement.";
-  }
-
-  if (
-    normalizedMessage.includes("top product") ||
-    normalizedMessage.includes("best product")
-  ) {
-    return "Your top movers right now are Xiaomi Power Bank 20000mAh, Realme Buds Air 3, Logitech K380 Keyboard, Samsung Galaxy A34 5G, and Samsung 43-inch Smart TV.";
-  }
-
-  if (
-    normalizedMessage.includes("inventory") ||
-    normalizedMessage.includes("stock") ||
-    normalizedMessage.includes("low stock")
-  ) {
-    return "Inventory is mostly healthy, but Lenovo IdeaPad Slim 3, Samsung 43-inch Smart TV, HP LaserJet M126nw, and Samsung Galaxy A34 5G are getting low.";
-  }
-
-  if (
-    normalizedMessage.includes("profit") ||
-    normalizedMessage.includes("margin")
-  ) {
-    return "Your current gross margin is about 32.8%. Accessories are the strongest margin driver, while premium hardware remains important for revenue.";
-  }
-
-  if (
-    normalizedMessage.includes("customer") ||
-    normalizedMessage.includes("repeat buyer")
-  ) {
-    return "Your strongest customer segment is repeat buyers. Amit Kumar is the top individual customer this month, and repeat customers are driving more than half of revenue.";
-  }
-
-  return "I can help with sales, products, inventory, customers, and margins. Ask me something direct about your store and I'll keep the answer sharp.";
 }
 
 function getStoredCurrentUser() {
@@ -344,10 +299,10 @@ export interface BillingStatusResponse {
 
 export const api = {
   health() {
-    return request("/health").catch(() => ({
-      status: "ok",
-      mode: "local-demo",
-    }));
+    return request("/health");
+  },
+  intelligenceStatus(): Promise<{ provider: string; model: string | null; configured: boolean }> {
+    return request("/intelligence/status", { authenticated: true });
   },
   signup(payload: Record<string, unknown>) {
     return request("/auth/signup", {
@@ -424,14 +379,15 @@ export const api = {
     }
   },
   async session() {
+    const offlineToken = safeStorageGet("orrico_auth_token");
+    const offlineUser = getStoredCurrentUser();
     try {
       return await request("/auth/session", { authenticated: true });
     } catch (error) {
-      const token = safeStorageGet("orrico_auth_token");
-      const user = getStoredCurrentUser();
-
-      if (token === LOCAL_DEMO_TOKEN && user) {
-        return { user };
+      if (offlineToken === LOCAL_DEMO_TOKEN && offlineUser) {
+        safeStorageSet("orrico_auth_token", offlineToken);
+        safeStorageSet("orrico_current_user", JSON.stringify(offlineUser));
+        return { user: offlineUser };
       }
 
       throw error;
@@ -454,11 +410,9 @@ export const api = {
       return await request("/database/current", {
         authenticated: true,
       });
-    } catch {
+    } catch (error) {
       if (!isDemoSession()) {
-        throw new Error(
-          "Shop setup could not be loaded. Sign in again or check the backend connection.",
-        );
+        throw error;
       }
 
       return {
@@ -471,11 +425,9 @@ export const api = {
       return await request("/database/schema", {
         authenticated: true,
       });
-    } catch {
+    } catch (error) {
       if (!isDemoSession()) {
-        throw new Error(
-          "Database schema is not available until your shop is connected.",
-        );
+        throw error;
       }
 
       const localConnection = getStoredDatabaseConnection();
@@ -500,11 +452,9 @@ export const api = {
         authenticated: true,
         body: JSON.stringify(payload),
       });
-    } catch {
+    } catch (error) {
       if (!isDemoSession()) {
-        throw new Error(
-          "Database connection could not be saved. Check the backend and try again.",
-        );
+        throw error;
       }
 
       const connection = {
@@ -539,27 +489,12 @@ export const api = {
       body: JSON.stringify(payload),
     }) as Promise<CsvImportResponse>;
   },
-  async sendChatMessage(message: string): Promise<ChatMessageResponse> {
-    try {
+  async sendChatMessage(message: string, conversationId?: string): Promise<ChatMessageResponse> {
       return (await request("/chat/message", {
         method: "POST",
         authenticated: true,
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, conversationId }),
       })) as ChatMessageResponse;
-    } catch {
-      if (!isDemoSession()) {
-        throw new Error(
-          "Finish your shop setup before using chat.",
-        );
-      }
-
-      return {
-        reply: buildLocalChatReply(message),
-        sql: null,
-        rows: [],
-        mode: "local-demo",
-      };
-    }
   },
   chatHistory(): Promise<{ messages: StoredChatHistoryItem[] }> {
     return request("/chat/history", {
