@@ -84,7 +84,7 @@ export function DemoAccessPage({
 
             <div className="space-y-4">
               <h1 className="text-4xl font-semibold leading-tight tracking-normal sm:text-5xl">
-                Explore Aska with a working retail store
+                Take Aska for a spin.
               </h1>
               <p className="max-w-xl text-lg leading-8 text-muted-foreground">
                 Open a separate sample workspace with products, orders, customers,
@@ -187,7 +187,7 @@ export function DemoAccessPage({
               <div className="rounded-lg border border-border/70 bg-background/65 p-5">
                 <div className="mb-3 flex items-center gap-2">
                   <PackageCheck className="h-4 w-4" />
-                  <p className="font-medium">Try asking Ori</p>
+                  <p className="font-medium">Ask Aska</p>
                 </div>
                 <div className="space-y-2">
                   {sampleQuestions.map((question) => (

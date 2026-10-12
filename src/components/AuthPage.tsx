@@ -29,11 +29,6 @@ import { toast } from "sonner";
 import { api } from "../lib/api";
 import { safeStorageRemove, safeStorageSet } from "../lib/storage";
 
-const shopkeeperImage = new URL(
-  "../assets/2609b7d59d0b4c5c57d1b7fab24a98ad05088a2f.png",
-  import.meta.url,
-).href;
-
 interface LoginForm {
   email: string;
   password: string;
@@ -394,7 +389,7 @@ export function AuthPage({
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
+    <div className="aska-access min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
       <header className="border-b bg-background/95 backdrop-blur">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Logo />
@@ -430,14 +425,13 @@ export function AuthPage({
                 Your data. Your workspace.
               </Badge>
               <h1 className="text-3xl lg:text-4xl font-bold">
-                Transform Your Retail
+                Your data.
                 <span className="text-primary block">
-                  Business Today
+                  Your next answer.
                 </span>
               </h1>
               <p className="text-xl text-muted-foreground">
-                Join growing retailers who use Aska to keep sales, stock,
-                customers, and reporting in one clean operating workflow.
+                Connect your store data. Ask about sales, stock, and customers.
               </p>
             </div>
 
@@ -453,15 +447,7 @@ export function AuthPage({
               ))}
             </div>
 
-            <div className="relative rounded-2xl overflow-hidden shadow-xl">
-              <img
-                src={shopkeeperImage}
-                alt="Indian shopkeeper using computer in retail shop"
-                className="w-full h-auto aspect-video object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent"></div>
-            </div>
-          </div>
+            <div className="aska-access-art" aria-label="Aska workspace"><span>ASKA</span><div><CheckCircle/> Your data. Just ask.</div></div></div>
 
           <div className="w-full max-w-md mx-auto">
             <Card className="shadow-2xl border-0">

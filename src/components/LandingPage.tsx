@@ -1,45 +1,27 @@
-import { Header } from "./Header";
-import { Hero } from "./Hero";
-import { Features } from "./Features";
-import { HowItWorks } from "./HowItWorks";
-import { ChatDemo } from "./ChatDemo";
-import { LandingPricing } from "./LandingPricing";
-import { CTA } from "./CTA";
-import { Footer } from "./Footer";
-
-interface LandingPageProps {
-  onNavigateToAuth?: () => void;
-  onNavigateToSignIn?: () => void;
-  onNavigateToDemo?: () => void;
-  onNavigateToSupport?: () => void;
-}
-
-export function LandingPage({
-  onNavigateToAuth,
-  onNavigateToSignIn,
-  onNavigateToDemo,
-  onNavigateToSupport,
-}: LandingPageProps) {
-  return (
-    <div className="min-h-screen bg-background">
-      <Header
-        onSignInClick={onNavigateToSignIn || onNavigateToAuth}
-        onGetStartedClick={onNavigateToAuth}
-        onDemoClick={onNavigateToDemo}
-        onSupportClick={onNavigateToSupport}
-      />
-      <main>
-        <Hero
-          onGetStartedClick={onNavigateToAuth}
-          onDemoClick={onNavigateToDemo}
-        />
-        <Features />
-        <HowItWorks />
-        <ChatDemo />
-        <LandingPricing onGetStartedClick={onNavigateToAuth} />
-        <CTA onGetStartedClick={onNavigateToAuth} />
-      </main>
-      <Footer onSupportClick={onNavigateToSupport} />
-    </div>
-  );
+import { useEffect, useRef, useState } from "react";
+import { ArrowUpRight, ArrowRight, Database, Check, Menu, X, TrendingUp, ShieldCheck, Mic } from "lucide-react";
+import { Logo } from "./Logo";
+import "../styles/aska-site.css";
+interface LandingPageProps { onNavigateToAuth?: () => void; onNavigateToSignIn?: () => void; onNavigateToDemo?: () => void; onNavigateToSupport?: () => void; }
+const examples = [
+ { question: "Which products sold the most?", answer: "Your top three products by revenue.", columns: ["Product", "Revenue"], rows: [["Galaxy A34", "₹32,999"], ["Redmi Note 12", "₹18,999"], ["Power Bank", "₹4,795"]] },
+ { question: "What needs restocking?", answer: "Two products are below their reorder level.", columns: ["Product", "Stock left"], rows: [["USB-C Cable", "3 units"], ["Wireless Mouse", "5 units"]] },
+ { question: "How much did we sell?", answer: "Total sales were ₹56,793 across 3 orders.", columns: ["Metric", "Total"], rows: [["Revenue", "₹56,793"], ["Orders", "3"], ["Average order", "₹18,931"]] },
+];
+export function LandingPage({ onNavigateToAuth, onNavigateToSignIn, onNavigateToDemo, onNavigateToSupport }: LandingPageProps) {
+ const [menuOpen, setMenuOpen] = useState(false); const [example, setExample] = useState(0); const root = useRef<HTMLDivElement>(null);
+ useEffect(() => { const observer = new IntersectionObserver(entries => entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add("is-visible"); observer.unobserve(entry.target); } }), { threshold: .1 }); root.current?.querySelectorAll(".aska-reveal").forEach(node => observer.observe(node)); return () => observer.disconnect(); }, []);
+ const selected = examples[example]; const demo = () => { setMenuOpen(false); onNavigateToDemo?.(); };
+ return <div className="aska-site" ref={root}>
+ <header className="aska-nav"><a href="#overview" aria-label="Aska home"><Logo/></a><nav aria-label="Main navigation" className={menuOpen ? "aska-links open" : "aska-links"}><a href="#overview" onClick={() => setMenuOpen(false)}>Overview</a><a href="#features" onClick={() => setMenuOpen(false)}>Features</a><a href="#how-it-works" onClick={() => setMenuOpen(false)}>How it works</a><button onClick={demo}>Demo</button><button onClick={onNavigateToSupport}>Support</button></nav><div className="aska-nav-actions"><button className="aska-signin" onClick={onNavigateToSignIn || onNavigateToAuth}>Sign in <ArrowUpRight size={14}/></button><button className="aska-menu" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X/> : <Menu/>}</button></div></header>
+ <main>
+ <section id="overview" className="aska-hero"><div className="aska-hero-intro"><div className="aska-hero-mark"><Logo showText={false} iconClassName="h-14 w-14"/></div><h1>Aska</h1><p>Your data. Just ask.</p><div className="aska-actions"><a className="aska-button" href="#features">Explore Aska</a><button className="aska-button outline" onClick={demo}>Try the demo <ArrowUpRight size={15}/></button></div></div>
+ <div className="aska-stage" aria-label="Aska chat preview with sample sales data"><div className="aska-chrome-word" aria-hidden="true">ASKA</div><div className="aska-stage-halo"/><div className="aska-device"><div className="aska-device-top"><span className="aska-status-dot"/>Aska Chat <span>DEMO</span></div><div className="aska-device-question">What were my sales yesterday?<ArrowUpRight size={14}/></div><div className="aska-device-response"><span className="aska-small-mark">a</span><p>You sold <strong>₹56,793</strong><br/><span>across 3 orders.</span></p></div><div className="aska-chart" aria-label="Sample sales chart"><i/><i/><i/><i/><i/><i/><i/><i/><i/></div><div className="aska-device-bottom"><span>Ask your next question</span><Mic size={16}/><button onClick={demo} aria-label="Open Aska demo"><ArrowUpRight size={17}/></button></div></div><div className="aska-float-label"><Database size={14}/>Connected to your data</div></div>
+ <div className="aska-hero-caption"><span>Less searching. More knowing.</span><a href="#features">Meet your new way to work <ArrowRight size={14}/></a></div></section>
+ <section className="aska-integrations"><span>Bring the data you already use.</span><div><span><Database size={18}/>PostgreSQL</span><span><Database size={18}/>MySQL</span><span><Database size={18}/>SQLite</span><span><Database size={18}/>CSV</span></div></section>
+ <section id="features" className="aska-section aska-reveal"><div className="aska-section-heading"><span className="aska-eyebrow">01 / ASK</span><h2>Big questions.<br/><span>Clear answers.</span></h2><p>Find sales, stock, and customer insights without digging through rows of data.</p></div><div className="aska-feature-layout"><div className="aska-question-list">{examples.map((item,index) => <button key={item.question} className={index === example ? "active" : ""} onClick={() => setExample(index)} aria-pressed={index === example}><span>0{index+1}</span>{item.question}<ArrowUpRight size={18}/></button>)}<p>Preview with sample data. <button onClick={demo}>Open the full demo <ArrowRight size={14}/></button></p></div><div className="aska-answer-preview" aria-live="polite"><div className="aska-preview-label"><Logo showText={false} iconClassName="h-6 w-6"/>Aska Chat <span>Sample answer</span></div><h3>{selected.answer}</h3><table><thead><tr>{selected.columns.map(column => <th key={column}>{column}</th>)}</tr></thead><tbody>{selected.rows.map(row => <tr key={row[0]}>{row.map(value => <td key={value}>{value}</td>)}</tr>)}</tbody></table><div className="aska-answer-foot"><Check size={14}/>Results from your connected database</div></div></div></section>
+ <section className="aska-section aska-tools aska-reveal"><div className="aska-section-heading"><span className="aska-eyebrow">02 / SEE</span><h2>Your whole store.<br/><span>In view.</span></h2></div><div className="aska-tool-grid"><article><TrendingUp/><h3>Follow your sales.</h3><p>See revenue, orders, and your best products in one dashboard.</p><div className="aska-mini-revenue"><span>REVENUE · SAMPLE</span><strong>₹56,793 <small>↗</small></strong><div className="aska-sparkline"/></div></article><article><Database/><h3>Use your own data.</h3><p>Connect a database or import a CSV. Start with what you have.</p><div className="aska-connect-visual"><span>PostgreSQL</span><span>MySQL</span><span>CSV</span><div><span className="aska-status-dot"/>Ready to connect</div></div></article><article><ShieldCheck/><h3>Keep work separate.</h3><p>Explore sample data in the demo. Your account gets its own workspace.</p><div className="aska-workspace-visual"><span><ShieldCheck size={18}/>Your workspace</span><span><Check size={15}/>Your connection</span><span><Check size={15}/>Your chat history</span></div></article></div></section>
+ <section id="how-it-works" className="aska-section aska-steps aska-reveal"><div className="aska-section-heading"><span className="aska-eyebrow">03 / START</span><h2>From connected<br/><span>to understood.</span></h2></div><div className="aska-step-grid">{[["Connect","Choose your database or upload a CSV."],["Ask","Type a question in your own words."],["Explore","Read the answer. Ask a follow-up."]].map(([title,body],index) => <article key={title}><span>0{index+1}</span><h3>{title}</h3><p>{body}</p></article>)}</div></section>
+ <section className="aska-final aska-reveal"><span className="aska-eyebrow">YOUR NEXT QUESTION STARTS HERE</span><h2>Go ahead.<br/><span>Ask Aska.</span></h2><div className="aska-actions"><button className="aska-button" onClick={onNavigateToAuth}>Create your account <ArrowUpRight size={16}/></button><button className="aska-button outline" onClick={demo}>Explore the demo</button></div><p>No data to connect yet? Try the sample store.</p></section>
+ </main><footer className="aska-footer"><Logo/><span>© {new Date().getFullYear()} Aska</span><div><button onClick={onNavigateToSupport}>Help & privacy</button><button onClick={onNavigateToSignIn || onNavigateToAuth}>Sign in <ArrowUpRight size={14}/></button></div></footer></div>;
 }
