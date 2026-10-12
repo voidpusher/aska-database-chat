@@ -8,6 +8,7 @@ import {
   Package,
   IndianRupee,
   MessageSquare,
+  Menu,
   Database,
   Settings,
   LogOut,
@@ -24,8 +25,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Logo } from "./Logo";
+import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { Button } from "./ui/button";
-import { ThemeToggle } from "./ThemeToggle";
 import {
   Card,
   CardContent,
@@ -52,6 +53,8 @@ import {
 import { Progress } from "./ui/progress";
 import {
   BarChart,
+  AreaChart,
+  Area,
   Bar,
   LineChart,
   Line,
@@ -69,6 +72,7 @@ import {
   safeJsonParse,
   safeStorageGet,
   safeStorageSet,
+  safeStorageRemove,
 } from "../lib/storage";
 import {
   api,
@@ -95,6 +99,8 @@ import {
   SelectValue,
 } from "./ui/select";
 import { Switch } from "./ui/switch";
+
+const CATEGORY_COLORS = ["#79b8a9", "#d5af75", "#bd9bd0", "#d88e80", "#aabf7d", "#c58faa", "#8daab8"];
 
 interface DashboardPageProps {
   onLogout: () => void;
@@ -241,7 +247,7 @@ const initialCustomers: Customer[] = [
     totalSpent: 143200,
     lastOrder: "1 day ago",
   },
-  
+
   {
     id: "4",
     name: "Vikash Singh",
@@ -278,7 +284,7 @@ const initialCustomers: Customer[] = [
     totalSpent: 76400,
     lastOrder: "3 days ago",
   },
-  
+
   {
     id: "8",
     name: "Arjun Malhotra",
@@ -333,7 +339,7 @@ const initialCustomers: Customer[] = [
     totalSpent: 42100,
     lastOrder: "1 week ago",
   },
-  
+
   {
     id: "14",
     name: "Ravi Krishnan",
@@ -379,7 +385,7 @@ const initialCustomers: Customer[] = [
     totalSpent: 24800,
     lastOrder: "2 weeks ago",
   },
-  
+
   {
     id: "19",
     name: "Deepa Rao",
@@ -600,10 +606,10 @@ export function DashboardPage({
 }: DashboardPageProps) {
   const currentUser = safeJsonParse<{ authProvider?: string; businessName?: string; firstName?: string; lastName?: string; email?: string }>(safeStorageGet("orrico_current_user"), {});
   const isDemoUser = currentUser.authProvider === "demo";
-  const businessName = isDemoUser ? "Gupta Electronics" : currentUser.businessName || "Your Workspace";
-  const ownerName = isDemoUser ? "Arjun Sharma" : `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim();
+  const businessName = currentUser.businessName || (isDemoUser ? "Demo Retail Store" : "Your Workspace");
+  const ownerName = `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim();
   const initials = isDemoUser ? "JS" : `${currentUser.firstName?.[0] || ""}${currentUser.lastName?.[0] || ""}`.toUpperCase() || "U";
-  const [selectedPeriod, setSelectedPeriod] = useState("7d");
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const [dashboardSummary, setDashboardSummary] =
@@ -621,6 +627,7 @@ export function DashboardPage({
   const [showNewOrderDialog, setShowNewOrderDialog] = useState(false);
   const [showStockDialog, setShowStockDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  useEffect(() => { if (safeStorageGet("aska_open_settings") === "true") { safeStorageRemove("aska_open_settings"); setShowSettingsDialog(true); } }, []);
   const [activeNavItem, setActiveNavItem] = useState("dashboard");
   const [posEnabled, setPosEnabled] = useState(() => {
     if (!isDemoUser) return false;
@@ -632,12 +639,12 @@ export function DashboardPage({
   const [products, setProducts] = useState<Product[]>(() => {
     if (!isDemoUser) return [];
     const savedVersion = safeStorageGet("orrico_data_version");
-    
+
     if (savedVersion !== DATA_VERSION) {
       safeStorageSet("orrico_data_version", DATA_VERSION);
       return initialProducts;
     }
-    
+
     const saved = safeStorageGet("orrico_products");
     return safeJsonParse(saved, initialProducts);
   });
@@ -655,7 +662,7 @@ export function DashboardPage({
       "Vidya Devi", "Gopal Krishna", "Suman Gupta", "Satish Kumar", "Lalita Singh",
       "Pankaj Mehta", "Bharati Devi", "Navin Kumar"
     ];
-    
+
     for (let i = 0; i < 43; i++) {
       additionalCustomers.push({
         id: (26 + i).toString(),
@@ -667,7 +674,7 @@ export function DashboardPage({
         lastOrder: i < 15 ? "1 month ago" : "2 months ago",
       });
     }
-    
+
     return [...initialCustomers, ...additionalCustomers];
   };
 
@@ -675,11 +682,11 @@ export function DashboardPage({
     if (!isDemoUser) return [];
     const savedVersion = safeStorageGet("orrico_data_version");
     const saved = safeStorageGet("orrico_customers");
-    
+
     if (savedVersion !== DATA_VERSION || !saved) {
       return getFullCustomerList();
     }
-    
+
     const parsedCustomers = safeJsonParse<Customer[]>(
       saved,
       getFullCustomerList(),
@@ -687,7 +694,7 @@ export function DashboardPage({
     if (parsedCustomers.length < 68) {
       return getFullCustomerList();
     }
-    
+
     return parsedCustomers;
   });
 
@@ -695,11 +702,11 @@ export function DashboardPage({
     if (!isDemoUser) return [];
     const savedVersion = safeStorageGet("orrico_data_version");
     const saved = safeStorageGet("orrico_orders");
-    
+
     if (savedVersion !== DATA_VERSION) {
       return initialOrders;
     }
-    
+
     return safeJsonParse(saved, initialOrders);
   });
 
@@ -916,7 +923,7 @@ export function DashboardPage({
       ];
       const randomName = newCustomerNames[Math.floor(Math.random() * newCustomerNames.length)];
       const customerId = `pos-${Date.now()}`;
-      
+
       selectedCustomer = {
         id: customerId,
         name: randomName,
@@ -926,21 +933,21 @@ export function DashboardPage({
         totalSpent: 0,
         lastOrder: "Just now",
       };
-      
+
       setCustomers(prev => [selectedCustomer, ...prev]);
     }
 
     const numProducts = Math.floor(Math.random() * 3) + 1;
     const selectedProducts: { product: Product; quantity: number }[] = [];
-    
+
     for (let i = 0; i < numProducts; i++) {
       const availableProducts = products.filter(p => p.stock > 0);
       if (availableProducts.length === 0) break;
-      
+
       const product = availableProducts[Math.floor(Math.random() * availableProducts.length)];
       const maxQuantity = Math.min(product.stock, 5);
       const quantity = Math.floor(Math.random() * maxQuantity) + 1;
-      
+
       selectedProducts.push({ product, quantity });
     }
 
@@ -984,7 +991,7 @@ export function DashboardPage({
 
     const now = new Date();
     const dateStr = `${now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
-    
+
     const order: Order = {
       id: `pos-${Date.now()}`,
       customerId: selectedCustomer.id,
@@ -1206,14 +1213,14 @@ export function DashboardPage({
           : undefined,
       })
       .then(async () => {
-        setNewOrder({ 
+        setNewOrder({
           isNewCustomer: false,
-          customerId: "", 
+          customerId: "",
           customerName: "",
           customerEmail: "",
           customerPhone: "",
-          productId: "", 
-          quantity: "1" 
+          productId: "",
+          quantity: "1"
         });
         setShowNewOrderDialog(false);
         await Promise.all([
@@ -1222,7 +1229,7 @@ export function DashboardPage({
           loadDashboardOrders({ silent: true }),
         ]);
 
-        const successMessage = newOrder.isNewCustomer 
+        const successMessage = newOrder.isNewCustomer
           ? `New customer "${customerName}" added and order created! ${quantity}x ${product.name} for Rs ${total.toLocaleString()}`
           : `Order created! ${customerName} purchased ${quantity}x ${product.name} for Rs ${total.toLocaleString()}`;
 
@@ -1605,195 +1612,25 @@ export function DashboardPage({
       : fallbackRecentCustomers;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <div className="flex w-80 shrink-0 flex-col overflow-hidden border-r bg-muted/20">
-        <div className="p-6 border-b">
-          <Logo iconClassName="h-6 w-6" className="mb-4" onClick={onNavigateToLanding} clickable={!!onNavigateToLanding} />
-          <div className="flex items-center gap-2 mb-3">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback>{initials}</AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="font-medium">{businessName}</p>
-              <p className="text-sm text-muted-foreground">
-                {isDemoUser ? "Demo Workspace" : "Customer Workspace"}
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-            <div className="flex items-center gap-2">
-              {posEnabled ? (
-                <>
-                  <Wifi className="h-4 w-4 text-green-600" />
-                  <div>
-                    <p className="text-sm font-medium">POS Connected</p>
-                    <p className="text-xs text-muted-foreground">Live sync active</p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <WifiOff className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">POS Offline</p>
-                    <p className="text-xs text-muted-foreground">Manual mode</p>
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="flex items-center gap-2" role="group" aria-label="POS system">
-              <span
-                className={`text-xs font-medium ${
-                  posEnabled ? "text-muted-foreground" : "text-foreground"
-                }`}
-              >
-                Off
-              </span>
-              <Switch
-                checked={posEnabled}
-                onCheckedChange={updatePosSystem}
-                aria-label="Turn POS system on or off"
-              />
-              <span
-                className={`text-xs font-medium ${
-                  posEnabled ? "text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                On
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-6 border-b">
-          <h3 className="font-medium mb-3">Quick Actions</h3>
-          <div className="space-y-2">
-            <Button
-              onClick={onNavigateToChat}
-              size="sm"
-              className="w-full justify-start"
-            >
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Ask Aska
-            </Button>
-            <Button
-              onClick={() => setShowNewOrderDialog(true)}
-              size="sm"
-              variant="outline"
-              className="w-full justify-start"
-              disabled={!canMutateCatalog}
-            >
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              New Order
-            </Button>
-          </div>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-6">
-          <h3 className="font-medium mb-3">Navigation</h3>
-          <div className="space-y-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`w-full justify-start ${
-                activeNavItem === "dashboard" ? "bg-accent shadow-sm" : "hover:bg-card/70"
-              }`}
-              onClick={() => handleNavigation("dashboard")}
-            >
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Dashboard
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`w-full justify-start ${
-                activeNavItem === "products" ? "bg-accent shadow-sm" : "hover:bg-card/70"
-              }`}
-              onClick={() => handleNavigation("products")}
-            >
-              <Package className="h-4 w-4 mr-2" />
-              Products
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`w-full justify-start ${
-                activeNavItem === "customers" ? "bg-accent shadow-sm" : "hover:bg-card/70"
-              }`}
-              onClick={() => handleNavigation("customers")}
-            >
-              <Users className="h-4 w-4 mr-2" />
-              Customers
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`w-full justify-start ${
-                activeNavItem === "orders" ? "bg-accent shadow-sm" : "hover:bg-card/70"
-              }`}
-              onClick={() => handleNavigation("orders")}
-            >
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              Orders
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`w-full justify-start ${
-                activeNavItem === "inventory" ? "bg-accent shadow-sm" : "hover:bg-card/70"
-              }`}
-              onClick={() => handleNavigation("inventory")}
-            >
-              <Database className="h-4 w-4 mr-2" />
-              Inventory
-            </Button>
-          </div>
-        </div>
-
-        <div className="p-6 border-t space-y-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            onClick={onNavigateToSupport}
-          >
-            <HelpCircle className="h-4 w-4 mr-2" />
-            Support
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            onClick={handleSettings}
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            onClick={onLogout}
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </Button>
-        </div>
-      </div>
-
-      <div className="min-w-0 flex-1 overflow-auto">
-        <div className="p-6 border-b bg-background">
+    <div className="workspace-shell workspace-dashboard flex h-screen overflow-hidden bg-background">
+      <WorkspaceSidebar businessName={businessName} initials={initials} isDemo={isDemoUser} active={activeNavItem} onHome={onNavigateToLanding} onChat={onNavigateToChat} onNavigate={handleNavigation} onSupport={onNavigateToSupport} onSettings={handleSettings} onLogout={onLogout}>
+        <div className="workspace-pos"><span><i className={posEnabled ? "online" : ""}/>{posEnabled ? "POS connected" : "Manual mode"}</span><Switch checked={posEnabled} onCheckedChange={updatePosSystem} aria-label="Turn POS system on or off"/></div>
+        <Button className="workspace-new-order" variant="outline" onClick={() => setShowNewOrderDialog(true)} disabled={!canMutateCatalog}><ShoppingCart className="h-4 w-4"/>New order</Button>
+      </WorkspaceSidebar>
+      <Dialog open={workspaceMenuOpen} onOpenChange={setWorkspaceMenuOpen}><DialogContent className="max-h-[85dvh] overflow-y-auto"><DialogTitle>Workspace navigation</DialogTitle>{["dashboard","products","customers","orders","inventory"].map(page => <Button key={page} variant="outline" onClick={() => {handleNavigation(page);setWorkspaceMenuOpen(false);}}>{page === "dashboard" ? "Overview" : page[0].toUpperCase()+page.slice(1)}</Button>)}<Button variant="outline" onClick={onNavigateToChat}>Aska Chat</Button><Button variant="outline" onClick={handleSettings}>Settings</Button><Button variant="outline" onClick={onLogout}>Sign out</Button></DialogContent></Dialog>
+      <div className="workspace-dashboard-main min-w-0 flex-1 overflow-auto" style={{ backdropFilter: "blur(32px)" }}>
+        <div className="workspace-header workspace-dashboard-header" style={{ backdropFilter: "blur(40px) saturate(100%)" }}>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-semibold">
-                {activeNavItem === "dashboard" && "Dashboard"}
+              <div className="flex items-center gap-3"><button className="workspace-mobile-menu" aria-label="Open workspace navigation" onClick={() => setWorkspaceMenuOpen(true)}><Menu size={20}/></button><h1 className="text-3xl font-semibold">
+                {activeNavItem === "dashboard" && "Overview"}
                 {activeNavItem === "products" && "Products"}
                 {activeNavItem === "customers" && "Customers"}
                 {activeNavItem === "orders" && "Orders"}
                 {activeNavItem === "inventory" && "Inventory"}
-              </h1>
+              </h1></div>
               <p className="text-muted-foreground">
-                {activeNavItem === "dashboard" && "Welcome back! Here's what's happening with your store today."}
+                {activeNavItem === "dashboard" && "Revenue, orders, and inventory."}
                 {activeNavItem === "products" && "View and manage all your products"}
                 {activeNavItem === "customers" && "Manage your customer relationships"}
                 {activeNavItem === "orders" && "Track recent orders and customer purchases"}
@@ -1801,7 +1638,7 @@ export function DashboardPage({
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <ThemeToggle />
+
               <Button variant="outline" size="sm" onClick={handleExport}>
                 <Download className="h-4 w-4 mr-2" />
                 Export
@@ -1819,20 +1656,17 @@ export function DashboardPage({
                 />
                 {isDashboardLoading ? "Updating..." : "Refresh"}
               </Button>
-              <Button>
-                <Calendar className="h-4 w-4 mr-2" />
-                Last 7 days
-              </Button>
+              <span className="workspace-period"><Calendar className="h-4 w-4"/>Last 7 days</span>
             </div>
           </div>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="workspace-dashboard-content p-6 space-y-6">
           {activeNavItem === "dashboard" && (
             <>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <div style={{ backdropFilter: "blur(40px) saturate(100%)" }} className="workspace-metrics grid grid-cols-2 xl:grid-cols-4">
             {metrics.map((metric, index) => (
-              <Card key={index} className="bg-card/92">
+              <Card key={index} className="workspace-metric">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     {metric.title}
@@ -1867,8 +1701,8 @@ export function DashboardPage({
             ))}
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Card className="bg-card/92">
+          <div className="workspace-charts grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card style={{ backdropFilter: "blur(40px) saturate(100%)" }} className="bg-card/92">
               <CardHeader>
                 <CardTitle>Revenue Overview</CardTitle>
                 <CardDescription>
@@ -1876,24 +1710,24 @@ export function DashboardPage({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={salesData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip
+                <ResponsiveContainer width="100%" height={260}>
+                  <AreaChart data={salesData} margin={{top: 24, right: 12, left: 0, bottom: 4}}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#292929" vertical={false} />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: "#999999", fontSize: 11}}/>
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: "#999999", fontSize: 11}} width={52}/>
+                    <Tooltip contentStyle={{backgroundColor: "#191919", color: "#f3f3f3", border: "1px solid #454545", borderRadius: 14, fontSize: 12}} labelStyle={{color: "#f3f3f3"}} itemStyle={{color: "#e0e0e0"}} cursor={{fill: "#ffffff06"}}
                       formatter={(value) => [
                           `Rs ${value.toLocaleString()}`,
                         "Revenue",
                       ]}
                     />
-                    <Bar dataKey="revenue" fill="#4f46e5" radius={[10, 10, 4, 4]} />
-                  </BarChart>
+                    <Area type="monotone" dataKey="revenue" stroke="#eeeeee" strokeWidth={2.4} fill="#eeeeee" fillOpacity={0.08} activeDot={{r: 5, fill: "#ffffff", stroke: "#242424", strokeWidth: 3}}/>
+                  </AreaChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            <Card className="bg-card/92">
+            <Card style={{ backdropFilter: "blur(40px) saturate(100%)" }} className="bg-card/92">
               <CardHeader>
                 <CardTitle>Sales by Category</CardTitle>
                 <CardDescription>
@@ -1901,25 +1735,26 @@ export function DashboardPage({
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={260}>
                   <PieChart>
                     <Pie
                       data={categoryData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={5}
+                      innerRadius={78}
+                      outerRadius={108}
+                      paddingAngle={3}
                       dataKey="value"
                     >
                       {categoryData.map((entry, index) => (
                         <Cell
                           key={`cell-${index}`}
-                          fill={entry.color}
+                          fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]}
                         />
                       ))}
                     </Pie>
-                    <Tooltip
+                    <text x="50%" y="48%" textAnchor="middle" fill="#eeeeee" fontSize={26} fontWeight={500}>{categoryData.length}</text><text x="50%" y="58%" textAnchor="middle" fill="#aaaaaa" fontSize={11}>categories</text>
+                    <Tooltip contentStyle={{backgroundColor: "#191919", color: "#f3f3f3", border: "1px solid #454545", borderRadius: 14, fontSize: 12}} labelStyle={{color: "#f3f3f3"}} itemStyle={{color: "#e0e0e0"}} cursor={{fill: "#ffffff06"}}
                       formatter={(value) => [
                         `${value}%`,
                         "Share",
@@ -1937,7 +1772,7 @@ export function DashboardPage({
                         <div
                           className="w-3 h-3 rounded-full"
                           style={{
-                            backgroundColor: category.color,
+                            backgroundColor: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
                           }}
                         />
                         <span className="text-sm">
@@ -1965,7 +1800,7 @@ export function DashboardPage({
             </TabsList>
 
             <TabsContent value="products">
-              <Card className="bg-card/92">
+              <Card style={{ backdropFilter: "blur(40px) saturate(100%)" }} className="bg-card/92">
                 <CardHeader>
                   <CardTitle>Top Selling Products</CardTitle>
                   <CardDescription>
@@ -2741,16 +2576,16 @@ export function DashboardPage({
                 <div>
                   <p className="font-medium">New Customer</p>
                   <p className="text-xs text-muted-foreground">
-                    {newOrder.isNewCustomer 
-                      ? "Adding a new customer with this order" 
+                    {newOrder.isNewCustomer
+                      ? "Adding a new customer with this order"
                       : "Select from existing customers"}
                   </p>
                 </div>
               </div>
               <Switch
                 checked={newOrder.isNewCustomer}
-                onCheckedChange={(checked) => setNewOrder({ 
-                  ...newOrder, 
+                onCheckedChange={(checked) => setNewOrder({
+                  ...newOrder,
                   isNewCustomer: checked,
                   customerId: "",
                   customerName: "",
@@ -2877,14 +2712,14 @@ export function DashboardPage({
               variant="outline"
               onClick={() => {
                 setShowNewOrderDialog(false);
-                setNewOrder({ 
+                setNewOrder({
                   isNewCustomer: false,
-                  customerId: "", 
+                  customerId: "",
                   customerName: "",
                   customerEmail: "",
                   customerPhone: "",
-                  productId: "", 
-                  quantity: "1" 
+                  productId: "",
+                  quantity: "1"
                 });
               }}
             >
@@ -3023,7 +2858,7 @@ export function DashboardPage({
                     <div>
                       <p className="font-medium">POS System Integration</p>
                       <p className="text-sm text-muted-foreground">
-                        {posEnabled 
+                        {posEnabled
                           ? "Automatically sync sales from POS terminal"
                           : "Enable to sync transactions in real-time"
                         }
@@ -3044,12 +2879,12 @@ export function DashboardPage({
                     </span>
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label>POS Terminal ID</Label>
                   <Input disabled value="TERM-2024-001" />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label>Sync Status</Label>
                   <div className="flex items-center gap-2">

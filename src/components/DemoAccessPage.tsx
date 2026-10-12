@@ -11,7 +11,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Logo } from "./Logo";
-import { ThemeToggle } from "./ThemeToggle";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 
@@ -65,7 +64,7 @@ export function DemoAccessPage({
             <Logo />
           </button>
           <div className="flex items-center gap-2">
-            <ThemeToggle />
+
             <Button variant="ghost" onClick={onBack} className="gap-2">
               <ArrowLeft className="h-4 w-4" />
               <span className="hidden sm:inline">Back to home</span>

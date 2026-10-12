@@ -13,6 +13,7 @@ import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
 import { Badge } from "./ui/badge";
 import { Logo } from "./Logo";
+import "../styles/auth.css";
 import {
   Eye,
   EyeOff,
@@ -380,17 +381,9 @@ export function AuthPage({
     }
   };
 
-  const benefits = [
-    "Connect PostgreSQL, MySQL, or upload a CSV",
-    "Ask questions in plain language",
-    "Real-time analytics and insights",
-    "SQL and query results you can inspect",
-    "Encrypted database credentials",
-  ];
-
   return (
-    <div className="aska-access min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
-      <header className="border-b bg-background/95 backdrop-blur">
+    <div className="aska-access aska-auth min-h-screen">
+      <header className="aska-auth-header">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Logo />
           <div className="flex items-center gap-4">
@@ -409,61 +402,30 @@ export function AuthPage({
                 onClick={onBackToHome}
               >
                 <ArrowLeft className="w-4 h-4" />
-                Back to Home
+                Home
               </Button>
             )}
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid lg:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
-          <div className="space-y-8">
-            <div className="space-y-4">
-              <Badge variant="secondary" className="w-fit">
-                <CheckCircle className="w-4 h-4 mr-1" />
-                Your data. Your workspace.
-              </Badge>
-              <h1 className="text-3xl lg:text-4xl font-bold">
-                Your data.
-                <span className="text-primary block">
-                  Your next answer.
-                </span>
-              </h1>
-              <p className="text-xl text-muted-foreground">
-                Connect your store data. Ask about sales, stock, and customers.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              {benefits.map((benefit, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-3"
-                >
-                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-                  <span>{benefit}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="aska-access-art" aria-label="Aska workspace"><span>ASKA</span><div><CheckCircle/> Your data. Just ask.</div></div></div>
-
-          <div className="w-full max-w-md mx-auto">
-            <Card className="shadow-2xl border-0">
-              <CardHeader className="text-center space-y-4">
+      <div className="aska-auth-content">
+        <div className="aska-auth-layout">
+          <div className="aska-auth-form">
+            <Card className="aska-auth-card">
+              <CardHeader className="text-center space-y-4"><div className="aska-auth-symbol"><Logo showText={false} iconClassName="h-10 w-10" /></div>
                 <CardTitle className="text-2xl">
-                  {authMode === "login" && "Welcome Back"}
-                  {authMode === "signup" && "Create Account"}
+                  {authMode === "login" && "Sign in to Aska"}
+                  {authMode === "signup" && "Create your account"}
                   {authMode === "verify" && "Verify Email"}
                   {authMode === "forgot" && "Reset Password"}
                   {authMode === "reset" && "Choose New Password"}
                 </CardTitle>
                 <CardDescription className="text-base">
                   {authMode === "login" &&
-                    "Sign in to your account or try the live demo instantly"}
+                    "Welcome back to your workspace."}
                   {authMode === "signup" &&
-                    "Create your account or try the live demo to explore first"}
+                    "A workspace for your data."}
                   {authMode === "verify" &&
                     "Enter the verification token to activate your account"}
                   {authMode === "forgot" &&
@@ -471,27 +433,10 @@ export function AuthPage({
                   {authMode === "reset" &&
                     "Set a new password using your reset token"}
                 </CardDescription>
-                {isLogin && (
-                  <div className="flex gap-2">
-                    <Button type="button" variant={entryMode === "customer" ? "default" : "outline"} className="flex-1" onClick={() => setEntryMode("customer")} disabled={isLoading}>Customer Login</Button>
-                    <Button type="button" variant={entryMode === "demo" ? "default" : "outline"} className="flex-1" onClick={() => setEntryMode("demo")} disabled={isLoading}>Demo Window</Button>
-                  </div>
-                )}
-                {isLogin && entryMode === "demo" && (
-                  <div className="bg-muted/50 border border-muted-foreground/20 rounded-lg p-3 text-sm">
-                    <p className="text-muted-foreground"><strong>Demo Workspace</strong></p>
-                    <p className="text-muted-foreground mt-1">Explore sample sales, products, customers, orders, and business chat.</p>
-                  </div>
-                )}
               </CardHeader>
 
               <CardContent className="space-y-6">
-                {authMode === "login" && entryMode === "demo" && (
-                  <Button type="button" className="w-full" disabled={isLoading} onClick={() => onLoginSubmit({ email: "demo@orrico.com", password: "demo123", rememberMe: false })}>
-                    {isLoading ? "Opening demo..." : "Open Demo Workspace"}
-                  </Button>
-                )}
-                {authMode === "login" && entryMode === "customer" && (
+                {authMode === "login" && (
                   <form
                     onSubmit={loginForm.handleSubmit(
                       onLoginSubmit,
@@ -507,7 +452,8 @@ export function AuthPage({
                         <Input
                           id="email"
                           type="email"
-                          placeholder="owner@dukaan.in"
+                          placeholder="you@company.com"
+                          autoComplete="email"
                           className="pl-10"
                           {...loginForm.register("email", {
                             required: "Email is required",
@@ -548,6 +494,7 @@ export function AuthPage({
                           variant="ghost"
                           size="icon"
                           className="absolute right-1 top-1 h-8 w-8"
+                          aria-label={showPassword ? "Hide password" : "Show password"}
                           onClick={() =>
                             setShowPassword(!showPassword)
                           }
@@ -604,7 +551,7 @@ export function AuthPage({
                         className="w-full"
                         disabled={isLoading}
                       >
-                        {isLoading ? "Signing in..." : "Sign In to Your Workspace"}
+                        {isLoading ? "Signing in..." : "Sign in"}
                       </Button>
                     </div>
                   </form>
@@ -1080,32 +1027,8 @@ export function AuthPage({
                   )}
                 </div>
 
-                {(authMode === "login" || authMode === "signup") && (
-                  <div className="border-t border-border/70 pt-6">
-                    <div className="rounded-lg border border-border/70 bg-muted/45 p-4">
-                      <div className="mb-3 flex items-start gap-3 text-left">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background shadow-sm">
-                          <Sparkles className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="font-medium">Want to look around first?</p>
-                          <p className="mt-1 text-sm leading-5 text-muted-foreground">
-                            Open the separate demo account with sample sales,
-                            products, orders, and customers already loaded.
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full justify-between"
-                        onClick={onNavigateToDemo}
-                      >
-                        Explore Demo Account
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                {(authMode === "login" || authMode === "signup") && onNavigateToDemo && (
+                  <div className="aska-auth-demo"><span>Just exploring?</span><Button type="button" variant="link" onClick={onNavigateToDemo}>Try the demo <ArrowRight className="h-3 w-3" /></Button></div>
                 )}
               </CardContent>
             </Card>

@@ -2,8 +2,6 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { Menu, X } from "lucide-react";
 import { Logo } from "./Logo";
-import { ThemeToggle } from "./ThemeToggle";
-
 interface HeaderProps {
   onSignInClick?: () => void;
   onGetStartedClick?: () => void;
@@ -25,7 +23,7 @@ export function Header({
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <Logo />
-        
+
         <nav className="hidden md:flex items-center gap-6">
           <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">
             Features
@@ -45,9 +43,9 @@ export function Header({
         </nav>
 
         <div className="flex items-center gap-4">
-          <ThemeToggle />
-          <Button 
-            variant="ghost" 
+
+          <Button
+            variant="ghost"
             className="hidden md:inline-flex"
             onClick={onSignInClick}
           >

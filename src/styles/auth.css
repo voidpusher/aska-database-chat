@@ -1,0 +1,34 @@
+.aska-auth{background:#080b0d;color:#ecf0f2;font-family:Inter,Arial,sans-serif}
+.aska-auth .aska-auth-header{border:0;background:transparent;padding:16px 32px}
+.aska-auth-header>div{max-width:none;height:48px;padding:0}
+.aska-auth-header .font-semibold{font-size:20px}.aska-auth-header svg{width:24px;height:24px}
+.aska-auth-header button{font-size:12px;color:#8c989f;background:none;padding:8px}.aska-auth-header button:hover{color:#edf1f3;background:none}
+.aska-auth-header>div>div{gap:20px}.aska-auth-header button svg{display:none}
+.aska-auth-content{display:flex;justify-content:center;padding:48px 24px 88px;min-height:calc(100dvh - 80px)}
+.aska-auth-layout{width:100%;max-width:380px;margin:auto}
+.aska-auth-form{width:100%}
+.aska-auth .aska-auth-card{border:0!important;background:transparent;box-shadow:none!important;gap:0;border-radius:0}
+.aska-auth-card [data-slot='card-header']{padding:0 0 32px;text-align:center;display:block}
+.aska-auth-symbol{display:flex;align-items:center;justify-content:center;margin-bottom:24px;color:#e1e9ed}
+.aska-auth-card [data-slot='card-title']{font-size:30px;line-height:1.25;font-weight:500;letter-spacing:-1px;color:#f3f6f7}
+.aska-auth-card [data-slot='card-description']{font-size:13px;line-height:1.6;color:#8b9ba6;margin-top:10px}
+.aska-auth-card [data-slot='card-content']{padding:0}
+.aska-auth label{font-size:12px;font-weight:400;color:#b3c0c9}
+.aska-auth form{display:flex;flex-direction:column;gap:20px}.aska-auth form>div{margin:0}
+.aska-auth input{height:48px;border-radius:12px;border:1px solid #ffffff13;background:#ffffff04;color:#eaf0f3;font-size:14px;box-shadow:inset 0 1px #ffffff04}
+.aska-auth input::placeholder{color:#596e7c}.aska-auth input:focus-visible{border-color:#b6c8d352;box-shadow:0 0 0 3px #d4e4ee06;outline:0}
+.aska-auth .relative>svg{top:16px;color:#647b8b;stroke-width:1.5}
+.aska-auth .relative>button{top:8px;right:8px;color:#8195a3;background:none}
+.aska-auth form button[type='submit']{height:46px;border-radius:12px;background:#e7eef2;color:#142129;font-size:13px;font-weight:500;box-shadow:inset 0 1px #fff}
+.aska-auth form button[type='submit']:hover{background:#fff}
+.aska-auth button[data-slot='checkbox']{width:14px;height:14px;border-radius:4px;border-color:#ffffff25;background:none;box-shadow:none}
+.aska-auth button[data-slot='checkbox'][data-state='checked']{background:#c9d8e2;color:#17232b}
+.aska-auth form>.flex.items-center label,.aska-auth form>.flex.items-center button{font-size:11px}
+.aska-auth [data-slot='card-content']>.text-center{font-size:12px;color:#8b9ba6;margin-top:28px}
+.aska-auth [data-slot='card-content']>.text-center button{font-size:12px;color:#d1dee6;margin-left:4px}
+.aska-auth-demo{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:24px!important;padding-top:24px;border-top:1px solid #ffffff0b;font-size:12px;color:#7e929f}
+.aska-auth-demo button{height:auto;padding:0;font-size:12px;font-weight:400;color:#c2d2dc;gap:6px;text-decoration:none}
+.aska-auth button:focus-visible{outline:2px solid #c9d8e2;outline-offset:4px}
+@media(max-width:600px){.aska-auth .aska-auth-header{padding:12px 20px}.aska-auth-header>div>div{gap:12px}.aska-auth-content{padding:40px 24px 56px;min-height:calc(100dvh - 72px)}.aska-auth-layout{margin:0 auto}.aska-auth-card [data-slot='card-title']{font-size:27px}.aska-auth input{font-size:16px}.aska-auth-header button{font-size:11px}}
+
+.aska-auth .aska-auth-card{padding-block:0}.aska-auth-content{padding-top:32px;padding-bottom:48px}

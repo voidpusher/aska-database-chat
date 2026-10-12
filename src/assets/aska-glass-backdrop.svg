@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" fill="none">
+  <defs>
+    <linearGradient id="silk" x1="200" y1="100" x2="1200" y2="1000" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#101417"/>
+      <stop offset=".38" stop-color="#343b3f"/>
+      <stop offset=".47" stop-color="#687176"/>
+      <stop offset=".53" stop-color="#242a2e"/>
+      <stop offset=".78" stop-color="#101417"/>
+      <stop offset="1" stop-color="#090c0e"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="100" y1="0" x2="1350" y2="1000" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ccd3d6" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#c1cace" stop-opacity=".38"/>
+      <stop offset="1" stop-color="#ccd3d6" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="24"/></filter>
+  </defs>
+  <path fill="#080b0d" d="M0 0h1600v1000H0z"/>
+  <path d="M-270 1050C105 1050 120 620 520 580S900 570 1160 300 1530 190 1840-240" stroke="url(#silk)" stroke-width="280" opacity=".42" filter="url(#soft)"/>
+  <path d="M-270 1050C105 1050 120 620 520 580S900 570 1160 300 1530 190 1840-240" stroke="url(#edge)" stroke-width="1.5" opacity=".65"/>
+  <path d="M-370 1120C130 1130 160 680 540 640S930 625 1210 365 1590 260 1880-170" stroke="url(#edge)" stroke-width="2" opacity=".25"/>
+  <path d="M760 1270C1160 980 820 930 1270 795S1670 610 1750 280" stroke="url(#silk)" stroke-width="180" opacity=".34" filter="url(#soft)"/>
+  <path d="M760 1270C1160 980 820 930 1270 795S1670 610 1750 280" stroke="url(#edge)" stroke-width="1" opacity=".35"/>
+</svg>

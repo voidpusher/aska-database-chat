@@ -18,9 +18,9 @@ import {
   type IntentDefinition,
 } from "../data/chatIntents";
 import { api } from "../lib/api";
-import { safeJsonParse, safeStorageGet } from "../lib/storage";
+import { safeJsonParse, safeStorageGet, safeStorageSet } from "../lib/storage";
 import { Logo } from "./Logo";
-import { ThemeToggle } from "./ThemeToggle";
+import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { ChatAnswer } from "./ChatAnswer";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Badge } from "./ui/badge";
@@ -29,6 +29,7 @@ import { Card, CardContent } from "./ui/card";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
+import "../styles/chat-layout.css";
 
 interface ChatPageProps {
   onLogout: () => void;
@@ -533,7 +534,7 @@ export function ChatPage({
 }: ChatPageProps) {
   const currentUser = safeJsonParse<{ authProvider?: string; businessName?: string; firstName?: string; lastName?: string }>(safeStorageGet("orrico_current_user"), {});
   const isDemoUser = currentUser.authProvider === "demo";
-  const businessName = isDemoUser ? "Jai's Electronics" : currentUser.businessName || "Your Workspace";
+  const businessName = currentUser.businessName || (isDemoUser ? "Demo Retail Store" : "Your Workspace");
   const initials = isDemoUser ? "JS" : `${currentUser.firstName?.[0] || ""}${currentUser.lastName?.[0] || ""}`.toUpperCase() || "U";
   const [sourceConnected, setSourceConnected] = useState(isDemoUser);
   const [intelligenceProvider, setIntelligenceProvider] = useState("checking");
@@ -1120,161 +1121,57 @@ export function ChatPage({
   };
 
   const handleSettings = () => {
-    toast.info("Settings panel coming soon!");
+    safeStorageSet("aska_open_settings", "true");
+    onNavigateToDashboard();
   };
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <div className="flex w-80 flex-col border-r bg-muted/20">
-        <div className="border-b p-6">
-          <Logo
-            iconClassName="h-6 w-6"
-            className="mb-4"
-            onClick={onNavigateToLanding}
-            clickable={!!onNavigateToLanding}
-          />
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback>{initials}</AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="font-medium">{businessName}</p>
-              <p className="text-sm text-muted-foreground">{isDemoUser ? "Demo Workspace" : "Customer Workspace"}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-b p-6">
-          <h3 className="mb-3 font-medium">Today's Overview</h3>
-          <div className="space-y-3">
-            {quickStats.map((stat, index) => (
-              <div key={index} className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  {stat.label}
-                </span>
-                <div className="text-right">
-                  <p className="font-medium">{stat.value}</p>
-                  <Badge
-                    variant={stat.positive ? "default" : "secondary"}
-                    className="text-xs"
-                  >
-                    {stat.change}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex-1 p-6">
-          <h3 className="mb-3 font-medium">Quick Questions</h3>
-          <div className="space-y-2">
-            {quickQuestions.map((question, index) => (
-              <Button
-                key={index}
-                variant="ghost"
-                size="sm"
-                className="h-auto w-full justify-start p-2 text-left"
-                onClick={() => handleSendMessage(question)}
-              >
-                <span className="text-xs">{question}</span>
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-2 border-t p-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            onClick={onNavigateToDashboard}
-          >
-            <BarChart3 className="mr-2 h-4 w-4" />
-            Dashboard
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            onClick={onNavigateToSupport}
-          >
-            <HelpCircle className="mr-2 h-4 w-4" />
-            Support
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            onClick={handleSettings}
-          >
-            <Settings className="mr-2 h-4 w-4" />
-            Settings
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start"
-            onClick={onLogout}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="border-b bg-background p-6">
+    <div className="workspace-shell aska-chat-shell flex bg-background"><Dialog open={isMobileSidebarOpen} onOpenChange={setIsMobileSidebarOpen}><DialogContent className="max-h-[85dvh] overflow-y-auto"><DialogTitle>Workspace menu</DialogTitle><Button variant="outline" onClick={onNavigateToDashboard}>Dashboard</Button><Button variant="outline" onClick={onNavigateToSupport}>Support</Button><Button variant="outline" onClick={onNavigateToLanding}>Home</Button><Button variant="outline" onClick={handleSettings}>Settings</Button><Button variant="outline" onClick={onLogout}>Log out</Button></DialogContent></Dialog>
+      <WorkspaceSidebar businessName={businessName} initials={initials} isDemo={isDemoUser} active="chat" onHome={onNavigateToLanding} onChat={() => {}} onNavigate={onNavigateToDashboard} onSupport={onNavigateToSupport} onSettings={handleSettings} onLogout={onLogout} suggestions={quickQuestions} onQuestion={handleSendMessage}/>
+      <div className="workspace-chat-main flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" style={{ backdropFilter: "blur(32px)" }}>
+        <div className="workspace-header aska-chat-header shrink-0 p-4 md:p-6" style={{ backdropFilter: "blur(40px) saturate(100%)" }}>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold">Aska Chat</h1>
+              <div className="flex items-center gap-2"><Button className="md:hidden" variant="ghost" size="sm" aria-label="Open workspace menu" onClick={() => setIsMobileSidebarOpen(true)}><Menu className="h-5 w-5"/></Button><h1 className="text-xl md:text-2xl font-semibold">Aska Chat</h1></div>
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="flex items-center gap-1">
                 <Zap className="h-3 w-3" />
                 {isDemoUser ? "Demo Data" : sourceConnected ? "Connected" : "Connect Your Data"}
               </Badge>
-              <ThemeToggle />
+
               <Button
                 variant="outline"
                 size="sm"
                 onClick={onNavigateToDashboard}
               >
                 <BarChart3 className="mr-2 h-4 w-4" />
-                View Dashboard
+                Overview
               </Button>
             </div>
           </div>
         </div>
 
-        <ScrollArea ref={scrollAreaRef} className="flex-1 p-6">
-          <div className="mx-auto max-w-4xl space-y-6">
+        <ScrollArea ref={scrollAreaRef} className="aska-chat-messages min-h-0 flex-1">
+          <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex gap-4 ${
+                className={`workspace-message flex gap-4 ${
                   message.type === "user" ? "flex-row-reverse" : ""
                 }`}
               >
-                <Avatar className="h-8 w-8 shrink-0">
-                  <AvatarFallback>
-                    {message.type === "user" ? (
-                      <User className="h-4 w-4" />
-                    ) : (
-                      ASSISTANT_NAME
-                    )}
-                  </AvatarFallback>
-                </Avatar>
+                {message.type === "user" && <Avatar className="h-8 w-8 shrink-0"><AvatarFallback><User className="h-4 w-4" /></AvatarFallback></Avatar>}
                 <Card
-                  className={`min-w-0 max-w-[80%] overflow-hidden ${
+                  style={{ backdropFilter: "blur(40px) saturate(100%)" }}
+                  className={`workspace-message-body min-w-0 max-w-[86%] overflow-hidden ${
                     message.type === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : ""
+                      ? "workspace-user-message" : "workspace-assistant-message"
                   }`}
                 >
                   <CardContent className="p-4">
                     {message.type === "ai" ? (
-                      <ChatAnswer content={message.content} sql={message.sql} />
+                      <><div className="workspace-answer-label"><Logo showText={false} iconClassName="h-5 w-5" />Aska</div><ChatAnswer content={message.content} sql={message.sql} /></>
                     ) : (
                       <p className="whitespace-pre-wrap break-words">{message.content}</p>
                     )}
@@ -1287,7 +1184,7 @@ export function ChatPage({
             ))}
 
             {isTyping && (
-              <div className="flex gap-4">
+              <div style={{ backdropFilter: "blur(40px) saturate(100%)" }} className="flex gap-4">
                 <Avatar className="h-8 w-8 shrink-0">
                   <AvatarFallback>{ASSISTANT_NAME}</AvatarFallback>
                 </Avatar>
@@ -1312,9 +1209,9 @@ export function ChatPage({
           </div>
         </ScrollArea>
 
-        <div className="border-t bg-background p-6">
+        <div className="aska-chat-composer shrink-0 p-4 md:p-6">
           <div className="mx-auto max-w-4xl">
-            <div className="flex gap-4">
+            <div style={{ backdropFilter: "blur(40px) saturate(100%)" }} className="flex gap-4">
               <div className="relative flex-1">
                 <Input
                   value={isRecording && interimTranscript
@@ -1326,15 +1223,15 @@ export function ChatPage({
                   }}
                   placeholder={
                     hasSpeechSupport
-                      ? "Ask me about your business data or use the mic..."
-                      : "Ask me about your business data..."
+                      ? "Ask Aska anything about your data..."
+                      : "Ask Aska anything about your data..."
                   }
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       handleSendMessage(displayedInputValue);
                     }
                   }}
-                  className="pr-12"
+                  className="workspace-chat-input pr-12"
                 />
                 <Button
                   size="sm"
@@ -1357,7 +1254,9 @@ export function ChatPage({
               </div>
               <Button
                 onClick={() => handleSendMessage(displayedInputValue)}
-                disabled={!inputValue.trim()}
+                disabled={!displayedInputValue.trim() || isTyping}
+                aria-label="Send message"
+                className="workspace-send-button"
               >
                 <Send className="h-4 w-4" />
               </Button>
